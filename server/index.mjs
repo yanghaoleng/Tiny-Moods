@@ -408,6 +408,21 @@ const publicOriginFor = (request) => (
 ).replace(/\/$/, "");
 
 const accessTokenFrom = (request) => request.get("x-access-token") || request.query.token || "";
+const searchResumeTokenFor = (job) => crypto
+  .createHmac("sha256", job.accessTokenHash)
+  .update(`tiny-moods-search-resume:${job.id}`)
+  .digest("base64url");
+const verifySearchResumeToken = (token, job) => {
+  if (!token || !job?.accessTokenHash) return false;
+  const supplied = Buffer.from(String(token));
+  const expected = Buffer.from(searchResumeTokenFor(job));
+  return supplied.length === expected.length && crypto.timingSafeEqual(supplied, expected);
+};
+const canProcessJob = (request, job) => (
+  ownsJob(request, job)
+  || verifyAccessToken(accessTokenFrom(request), job.accessTokenHash)
+  || verifySearchResumeToken(accessTokenFrom(request), job)
+);
 
 const rateAllowed = (key, limit) => {
   const now = Date.now();
@@ -579,10 +594,13 @@ app.get("/api/works/search", (request, response) => {
   if (!rateAllowed(`work-search:${ip}`, 120)) return response.status(429).json({error: "查询太频繁，请稍后再试"});
   const normalizedName = name.toLocaleLowerCase("zh-CN");
   const items = [...jobs.values()]
-    .filter((job) => !job.demo && job.status === "ready" && String(job.title || "").normalize("NFKC").trim().toLocaleLowerCase("zh-CN") === normalizedName)
+    .filter((job) => !job.demo && ["ready", "awaiting_client_processing"].includes(job.status) && String(job.title || "").normalize("NFKC").trim().toLocaleLowerCase("zh-CN") === normalizedName)
     .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))
     .slice(0, 20)
-    .map(historyJob);
+    .map((job) => ({
+      ...historyJob(job),
+      ...(job.status === "awaiting_client_processing" ? {resumeToken: searchResumeTokenFor(job)} : {}),
+    }));
   response.setHeader("Cache-Control", "no-store");
   response.json({items});
 });
@@ -790,14 +808,14 @@ app.patch("/api/jobs/:id/appearance", async (request, response) => {
 
 app.get("/api/jobs/:id/sheet", (request, response) => {
   const job = jobs.get(request.params.id);
-  if (!job || (!ownsJob(request, job) && !verifyAccessToken(accessTokenFrom(request), job.accessTokenHash))) return response.status(404).end();
+  if (!job || !canProcessJob(request, job)) return response.status(404).end();
   response.setHeader("Cache-Control", "private, no-store");
   response.sendFile(path.join(generatedRoot, job.id, "sheet.jpg"));
 });
 
 app.post("/api/jobs/:id/faces", faceUpload.array("faces", 9), async (request, response) => {
   const job = jobs.get(request.params.id);
-  if (!job || (!ownsJob(request, job) && !verifyAccessToken(accessTokenFrom(request), job.accessTokenHash))) return response.status(404).json({error: "没有找到这个任务"});
+  if (!job || !canProcessJob(request, job)) return response.status(404).json({error: "没有找到这个任务"});
   if (job.avatars?.length === 9) return response.json(publicJob(job));
   if (job.status !== "awaiting_client_processing") return response.status(409).json({error: "任务暂时不能接收抠图结果"});
   if (request.files?.length !== 9) return response.status(400).json({error: "需要上传九张透明 PNG"});

@@ -1468,7 +1468,7 @@ function WorkHistoryDialog({onClose, onOpenWork}) {
             <label htmlFor="work-name-search">作品名字</label>
             <div><input ref={searchInputRef} id="work-name-search" value={query} maxLength={20} autoComplete="off" placeholder="例如：团子" onChange={(event) => { setQuery(event.target.value); setSearchState("idle"); setError(""); }} /><button type="submit" disabled={searchState === "loading"}><MagnifyingGlass weight="bold" />{searchState === "loading" ? "查询中" : "查询"}</button></div>
           </form>
-          {searchState === "ready" ? renderWorks(results, "没有找到同名的已完成作品") : null}
+          {searchState === "ready" ? renderWorks(results, "没有找到同名的已完成或待继续作品") : null}
         </div>
         {error ? <p className="work-history-error">{error}</p> : null}
       </motion.section>
@@ -1820,5 +1820,5 @@ export default function GeneratorApp() {
     return <SharedJobExperience job={job} onExit={() => navigate()} onRender={(appearance) => navigate(renderQuery("view", job.id, appearance))} />;
   }
   if (activeJobId) return <JobStatus job={job || createdJob} statusError={error} local={local} backLabel={route.viewId ? "返回互动页" : "制作新作品"} onBack={() => route.viewId ? navigate(`?view=${activeJobId}`) : navigate()} />;
-  return <Landing resumeOrderId={route.orderId} onRenderExample={(exampleId, appearance) => navigate(renderQuery("demo", exampleId, appearance))} onOpenWork={(work) => navigate(work.status === "ready" ? `?view=${encodeURIComponent(work.id)}` : `?job=${encodeURIComponent(work.id)}`)} onJobCreated={(nextJob) => { setCreatedJob(nextJob); window.history.replaceState({}, "", `${import.meta.env.BASE_URL}?job=${nextJob.id}`); setRoute(routeFromLocation()); window.scrollTo({top: 0}); }} />;
+  return <Landing resumeOrderId={route.orderId} onRenderExample={(exampleId, appearance) => navigate(renderQuery("demo", exampleId, appearance))} onOpenWork={(work) => { if (work.resumeToken) saveToken("job", work.id, work.resumeToken); navigate(work.status === "ready" ? `?view=${encodeURIComponent(work.id)}` : `?job=${encodeURIComponent(work.id)}`); }} onJobCreated={(nextJob) => { setCreatedJob(nextJob); window.history.replaceState({}, "", `${import.meta.env.BASE_URL}?job=${nextJob.id}`); setRoute(routeFromLocation()); window.scrollTo({top: 0}); }} />;
 }

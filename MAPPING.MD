@@ -20,7 +20,7 @@
 | 右上角生成记录 / 我的作品 | 当前浏览器通过匿名 Cookie 关联的任务记录入口 | `WorkHistoryDialog` / `.history-trigger` / `/api/history` / `tiny_moods_visitor` |
 | 左下角作者主页 / 作者链接 | 页面底部左侧通往 Mikey 个人主页、使用 NCM 同款页边距的小字外链 | `.landing-footer` / `author_home_open` / `https://mikeywa.icu` |
 | 正在生成的记录 / 等待本地完成 | 可从固定任务页继续轮询、拆图和抠图的未完成作品 | `?job=:id` / `resumeUrl` / `owned` / `useLocalMatting` |
-| 按名字找作品 / 搜作品 | 使用生成时完整名字精确查询已完成作品 | `.work-search-form` / `/api/works/search?name=` |
+| 按名字找作品 / 搜作品 | 使用生成时完整名字精确查询已完成或等待前端处理的作品；待处理结果可恢复生成 | `.work-search-form` / `/api/works/search?name=` / `resumeToken` / `searchResumeTokenFor` |
 | 确认生成和移除按钮 / 上传后操作栏 | 与名字输入框同排、同高、底边对齐的操作组 | `.photo-details` / `.photo-detail-actions` / `.generate-button` / `.remove-photo` |
 | 首页案例 | 上传区下方无框、微浮动的透明角色列 | `.example-gallery` / `.example-card` / `.example-card-portrait` |
 | 案例浮窗 | 桌面 3:4 预览浮窗、手机底部半弹窗 | `ExamplePreviewDialog` / `embedded` |
