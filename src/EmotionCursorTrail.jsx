@@ -89,7 +89,7 @@ function intersects(candidate, badge) {
 export default function EmotionCursorTrail() {
   const layerRef = useRef(null);
   const cursorRef = useRef(null);
-  const finePointer = useMedia("(hover: hover) and (pointer: fine)", true);
+  const finePointer = useMedia("(any-hover: hover) and (any-pointer: fine)", true);
   const reducedMotion = useMedia("(prefers-reduced-motion: reduce)", false);
 
   useEffect(() => {
@@ -254,11 +254,11 @@ export default function EmotionCursorTrail() {
     };
   }, [finePointer, reducedMotion]);
 
-  const showStatic = !finePointer || reducedMotion;
+  if (!finePointer) return null;
 
   return (
     <div ref={layerRef} className="emotion-cursor-layer" aria-hidden="true">
-      {showStatic ? (
+      {reducedMotion ? (
         <div className="emotion-static-trail">
           {STATIC_BADGES.map((badge) => (
             <span key={badge.text} style={{background: badge.color}}>{badge.text}</span>

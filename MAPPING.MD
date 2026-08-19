@@ -26,8 +26,8 @@
 | 案例浮窗 | 桌面 3:4 预览浮窗、手机底部半弹窗 | `ExamplePreviewDialog` / `embedded` |
 | 日系相册 / C 方案 | 首页固定的明亮轻日系视觉 | `.landing-theme` |
 | 打赏弹窗 | 免费生成前说明层 | `DonationDialog` |
-| 选模型 / Pro 和 Lite / 默认 Lite | 打赏层中的生成模型单选组；默认 Lite，提交所选 `model` 键 | `fallbackDonationModels` / `.donation-models` / `selectedModelKey` / `image-models.mjs` |
-| ¥0.60 / ¥0.22 / 打赏金额 | 随模型切换的建议打赏金额 | `.donation-model-price` / `.donation-amount` / `suggestedDonationCny` |
+| 选模型 / Pro 和 Lite / 默认 Lite | 打赏层中的双段 Switch；默认 Lite，提交所选 `model` 键 | `fallbackDonationModels` / `.donation-model-switch` / `selectedModelKey` / `image-models.mjs` |
+| ¥1 ~ ¥3 / 打赏金额 | 无“建议打赏”前缀的固定自愿支持区间 | `.donation-amount` / `suggestedDonationCny` |
 | 价格下面的小字 / 感谢文案 | 建议打赏金额下方的支持感谢语 | `.donation-support-copy` / `Calligraph` |
 | ¥1 ~ ¥3 | 固定的自愿打赏建议区间 | `.donation-amount` |
 | 复制作者微信 | 问题与建议联系入口 | `.donation-contact-copy` / `copyText("yanghaoleng")` |
@@ -43,7 +43,7 @@
 | 保存图片半弹窗 | 从页面底部打开的九图保存层 | `SaveImagesSheet` / `.share-sheet` / `sheetOpen` |
 | 保存 9 张透明图片 / 九图入口 | 打开透明图平铺保存页 | `.experience-share-action` / `setSheetOpen(true)` |
 | 九图平铺 / 九张列表 | 3×3 透明原图网格 | `.share-face-grid` / `.share-face-item` |
-| 一键保存 9 张 / 下载压缩包 | 位于九图列表底部；手机系统多图保存，电脑零压缩 ZIP 下载 | `saveAllFaces` / `prepareAvatarFiles` / `downloadFilesAsZip` / `zipSync` / `.share-save-all` |
+| 一键保存 9 张 / 下载压缩包 | 位于九图列表底部；优先手机系统多图保存，否则直接下载服务端预制白底 JPG ZIP | `saveAllFaces` / `prepareAvatarFiles` / `downloadArchiveUrl` / `faces-jpg-v2.zip` / `.share-save-all` |
 | 背景开关 | 互动页顶部的 5 种浅色轮播/纯白切换，作品主人设置持久化 | `.experience-display-controls` / `backgroundMode` / `carouselBackgrounds` / `PATCH /api/jobs/:id/appearance` |
 | 装饰开关 | 互动页顶部的贴纸显示切换，作品主人设置持久化 | `.experience-display-controls` / `decorations` / `stickerSlots` / `PATCH /api/jobs/:id/appearance` |
 | 主页图标 / 小房子 | 互动页左上角返回主页入口 | `.experience-top-actions` / `.experience-home` / `House` / `onExit` |
@@ -65,7 +65,7 @@
 | 波纹 | 半调点阵高亮扩散 | `HalftoneRippleBackground` |
 | 自动慢慢换一个 / Hover 不打断 | 独立于悬停状态的自动换装计时器 | `AUTO_CHANGE_INTERVAL` / `changeLook`；头像按钮无 `whileHover` |
 | 立即播放音乐 / 首次点击补播 | BGM 自动播放与浏览器策略回退 | `autoPlay` / `preload="auto"` / `tryStartAudio` |
-| WebP 预览 / PNG 原图 | 互动浏览走压缩图，保存走透明原图 | `avatar.src` / `avatar.downloadSrc` / `writeFacePreview` |
+| WebP 原图 / 白底 JPG | 长期存储和互动浏览走 1080px 透明 WebP；单张与 ZIP 下载统一为白底 JPG | `avatar.src` / `avatar.downloadSrc` / `writeFaceWebp` / `createFaceJpegBuffer` |
 | 全部图片压缩 | 静态 PNG 批量转 WebP | `npm run images:optimize` / `scripts/optimize-static-images.mjs` |
 | 图片长缓存 / 打开更快 | 指纹静态资源和作品 WebP 的一年不可变缓存 | `/assets` / `express.static(..., {maxAge: "1y", immutable: true})` / `/generated/:id/face-XX.webp` |
 | 按钮音效 / 电影感音效 | UI SFX `10 Cinematic` 语义音效层 | `uiSfx` / `playUISfx` / `data-uisfx` |

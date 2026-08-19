@@ -14,7 +14,7 @@ export async function renderVideo({projectRoot, jobDirectory, jobId, title, avat
     title,
     brand: `${title.toUpperCase()} ${lookCount}`,
     cornerText: `made for ${title}`,
-    avatarUrls: avatars.map((_avatar, index) => `${publicOrigin}/generated/${jobId}/face-${String(index + 1).padStart(2, "0")}.png`),
+    avatarUrls: avatars.map((_avatar, index) => `${publicOrigin}/generated/${jobId}/face-${String(index + 1).padStart(2, "0")}.webp`),
     themes: avatars.map(({accent, deep, bg}) => ({accent, deep, bg})),
     bgmUrl: `${publicOrigin}/jenniebgm.mp3`,
     lookCount,

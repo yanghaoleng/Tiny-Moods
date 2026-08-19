@@ -105,16 +105,6 @@
   }
 }
 
-@media (hover: none), (pointer: coarse) {
-  .emotion-static-trail {
-    display: flex;
-  }
-
-  .emotion-cursor {
-    display: none;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .emotion-static-trail {
     display: flex;

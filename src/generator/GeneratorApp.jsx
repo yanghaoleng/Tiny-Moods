@@ -173,7 +173,11 @@ const demoJobForProfile = (profile) => ({
   status: "ready",
   videoStatus: "local",
   pageUrl: `${import.meta.env.BASE_URL}?demo=${encodeURIComponent(profile.id)}`,
-  avatars: profile.avatars,
+  avatars: profile.avatars.map((avatar, index) => ({
+    ...avatar,
+    downloadSrc: `${import.meta.env.BASE_URL}generated/demo-${profile.id}/face-${String(index + 1).padStart(2, "0")}.jpg`,
+  })),
+  downloadArchiveUrl: `${import.meta.env.BASE_URL}generated/demo-${profile.id}/faces-jpg-v2.zip`,
   appearance: defaultAppearance,
 });
 
@@ -299,9 +303,12 @@ function useLocalMatting(job, accessToken, setJob) {
           if (active) setLocal({active: true, progress: 51 + Math.round(done / total * 10), stage: `本地抠图 ${done} / ${total}`, error: ""});
         });
         if (!active) return;
-        setLocal({active: true, progress: 62, stage: "正在上传九张透明表情", error: ""});
+        setLocal({active: true, progress: 62, stage: "正在上传九张轻量表情", error: ""});
         const body = new FormData();
-        blobs.forEach((blob, index) => body.append("faces", blob, `face-${String(index + 1).padStart(2, "0")}.png`));
+        blobs.forEach((blob, index) => {
+          const extension = blob.type === "image/webp" ? "webp" : "png";
+          body.append("faces", blob, `face-${String(index + 1).padStart(2, "0")}.${extension}`);
+        });
         const upload = await fetch(`${API_BASE}/jobs/${job.id}/faces`, {
           method: "POST",
           headers: authHeaders,
@@ -795,51 +802,31 @@ const copyText = async (value) => {
 
 const safeFilenamePart = (value) => value.replace(/[\\/:*?"<>|]/g, "-").trim() || "作品";
 
-const imageExtension = (src, mimeType = "") => {
-  if (mimeType.includes("png")) return "png";
-  if (mimeType.includes("webp")) return "webp";
-  if (mimeType.includes("jpeg")) return "jpg";
-  try {
-    const extension = new URL(src, window.location.href).pathname.split(".").pop()?.toLowerCase();
-    return ["png", "webp", "jpg", "jpeg"].includes(extension) ? extension.replace("jpeg", "jpg") : "png";
-  } catch {
-    return "png";
-  }
-};
-
 const prepareAvatarFiles = async (avatars, title, onProgress = () => {}) => {
   let completed = 0;
   return Promise.all(avatars.map(async (avatar, index) => {
     const source = avatar.downloadSrc || avatar.src;
     const response = await fetch(source);
     if (!response.ok) throw new Error(`第 ${index + 1} 张图片读取失败`);
-    const mimeType = response.headers.get("content-type") || "image/png";
+    const mimeType = response.headers.get("content-type") || "image/jpeg";
     const bytes = new Uint8Array(await response.arrayBuffer());
-    const extension = imageExtension(source, mimeType);
     const file = new File(
       [bytes],
-      `${safeFilenamePart(title)}-透明表情-${String(index + 1).padStart(2, "0")}.${extension}`,
-      {type: mimeType || `image/${extension}`},
+      `${safeFilenamePart(title)}-白底表情-${String(index + 1).padStart(2, "0")}.jpg`,
+      {type: "image/jpeg"},
     );
     completed += 1;
     onProgress(completed, avatars.length);
-    return {file, bytes};
+    return {file};
   }));
 };
 
-const downloadFilesAsZip = async (assets, title) => {
-  const {zipSync} = await import("fflate");
-  const entries = Object.fromEntries(assets.map(({file, bytes}) => [file.name, bytes]));
-  await new Promise((resolve) => window.requestAnimationFrame(resolve));
-  const archive = zipSync(entries, {level: 0});
-  const objectUrl = URL.createObjectURL(new Blob([archive], {type: "application/zip"}));
+const startFileDownload = (url) => {
   const link = document.createElement("a");
-  link.href = objectUrl;
-  link.download = `${safeFilenamePart(title)}-9张透明表情.zip`;
+  link.href = url;
   document.body.appendChild(link);
   link.click();
   link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
 };
 
 function SaveImagesSheet({job, appearance, onClose, onRender}) {
@@ -853,11 +840,12 @@ function SaveImagesSheet({job, appearance, onClose, onRender}) {
   const saveAllTimer = useRef(null);
 
   useEffect(() => {
+    const canShareFiles = window.matchMedia("(pointer: coarse)").matches && typeof navigator.share === "function";
+    if (!canShareFiles) return undefined;
     if (preparedAssets.length === job.avatars.length) return undefined;
     let active = true;
-    setSaveAllState("正在准备原图 0 / 9");
     void prepareAvatarFiles(job.avatars, job.title, (done, total) => {
-      if (active) setSaveAllState(`正在准备原图 ${done} / ${total}`);
+      if (active) setSaveAllState(`正在准备 JPG ${done} / ${total}`);
     })
       .then((assets) => {
         if (!active) return;
@@ -871,6 +859,15 @@ function SaveImagesSheet({job, appearance, onClose, onRender}) {
       });
     return () => { active = false; };
   }, [job.avatars, job.title, preparedAssets.length]);
+
+  useEffect(() => {
+    if (!job.downloadArchiveUrl) return undefined;
+    const controller = new AbortController();
+    void fetch(job.downloadArchiveUrl, {cache: "force-cache", signal: controller.signal})
+      .then((response) => response.ok ? response.arrayBuffer() : Promise.reject(new Error("ZIP 预取失败")))
+      .catch(() => {});
+    return () => controller.abort();
+  }, [job.downloadArchiveUrl]);
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -896,18 +893,18 @@ function SaveImagesSheet({job, appearance, onClose, onRender}) {
   };
 
   const saveAllFaces = async () => {
-    if (savingAll || preparedAssets.length !== job.avatars.length) return;
+    if (savingAll) return;
     setSavingAll(true);
     setError("");
     try {
       const useSystemSave = window.matchMedia("(pointer: coarse)").matches && navigator.canShare?.({files: preparedFiles});
       if (useSystemSave) {
         setSaveAllState("请选择系统保存");
-        await navigator.share({files: preparedFiles, title: `${job.title}的9张透明表情`});
+        await navigator.share({files: preparedFiles, title: `${job.title}的9张白底表情`});
         setSaveAllState("已打开系统保存");
       } else {
-        setSaveAllState("正在打包 9 张图片");
-        await downloadFilesAsZip(preparedAssets, job.title);
+        if (!job.downloadArchiveUrl) throw new Error("压缩包尚未准备好");
+        startFileDownload(job.downloadArchiveUrl);
         setSaveAllState("已开始下载 ZIP");
       }
       trackEvent("interaction", {action: "faces_save_completed", method: useSystemSave ? "system_share" : "zip"}, {jobId: job.id});
@@ -940,17 +937,17 @@ function SaveImagesSheet({job, appearance, onClose, onRender}) {
         <div className="share-faces-view">
           <div className="share-faces-heading">
             <h2 id="share-faces-title">保存九张图片</h2>
-            <p>点按看原图，也可以长按每张图片保存</p>
+            <p>白底 JPG，可点开或长按单张保存</p>
           </div>
-          <div className="share-face-grid" role="list" aria-label="九张透明表情">
+          <div className="share-face-grid" role="list" aria-label="九张白底 JPG 表情">
             {job.avatars.map((avatar, index) => (
               <a key={avatar.src} className="share-face-item" href={avatar.downloadSrc || avatar.src} target="_blank" rel="noreferrer" role="listitem" aria-label={`查看第 ${index + 1} 张大图`} data-uisfx="open" data-analytics-action="face_open" data-analytics-target={String(index + 1)}>
-                <img src={avatar.src} alt={`${job.title}透明表情 ${index + 1}`} decoding="async" />
+                <img src={avatar.src} alt={`${job.title}白底表情 ${index + 1}`} decoding="async" />
                 <span aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
               </a>
             ))}
           </div>
-          <button type="button" className="share-action-button share-action-primary share-save-all" onClick={saveAllFaces} disabled={savingAll || preparedAssets.length !== job.avatars.length} data-uisfx={preparedAssets.length === job.avatars.length ? "start" : "blocked"} data-analytics-action="faces_save_all"><DownloadSimple weight="bold" />{saveAllState || "一键保存 9 张"}</button>
+          <button type="button" className="share-action-button share-action-primary share-save-all" onClick={saveAllFaces} disabled={savingAll} data-uisfx="start" data-analytics-action="faces_save_all"><DownloadSimple weight="bold" />{saveAllState || "一键保存 9 张"}</button>
           {error ? <p className="share-sheet-error">{error}</p> : null}
           <div className="share-video-section">
             <button type="button" className="share-save-video" onClick={saveVideo} data-uisfx="start" data-analytics-action="video_generate" disabled={submitting}><DownloadSimple weight="bold" />{submitting ? "正在打开视频生成（测试）" : "保存视频（测试）"}</button>
@@ -1287,15 +1284,16 @@ function ExamplePreviewDialog({profile, onClose, onRender}) {
   );
 }
 
-function DonationDialog({busy, error, models = fallbackDonationModels, defaultModel = "lite", onClose, onContinue}) {
+function DonationDialog({busy, error, models = fallbackDonationModels, onClose, onContinue}) {
   const reduceMotion = useReducedMotion();
   const [method, setMethod] = useState("wechat");
   const [wechatCopied, setWechatCopied] = useState(false);
   const [supportCopy] = useState(() => `生成图片会产生费用，不需要给太多。${donationThanksCopies[Math.floor(Math.random() * donationThanksCopies.length)]}`);
+  const switchModels = ["lite", "pro"].map((key) => models.find((model) => model.key === key)).filter(Boolean);
   const [selectedModelKey, setSelectedModelKey] = useState(() => (
-    models.some((model) => model.key === defaultModel) ? defaultModel : models[0]?.key || "lite"
+    models.some((model) => model.key === "lite") ? "lite" : models[0]?.key || "lite"
   ));
-  const selectedModel = models.find((model) => model.key === selectedModelKey) || models[0] || fallbackDonationModels[0];
+  const selectedModel = models.find((model) => model.key === selectedModelKey) || switchModels[0] || fallbackDonationModels[0];
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -1313,9 +1311,8 @@ function DonationDialog({busy, error, models = fallbackDonationModels, defaultMo
       <motion.section className="donation-dialog" initial={reduceMotion ? false : {opacity: 0, y: 24, scale: 0.97}} animate={{opacity: 1, y: 0, scale: 1}} exit={reduceMotion ? {opacity: 0} : {opacity: 0, y: 12}} role="dialog" aria-modal="true" aria-labelledby="donation-title">
         <button type="button" className="donation-close" onClick={onClose} data-uisfx="close" data-analytics-action="donation_close" aria-label="关闭打赏说明"><X weight="bold" /></button>
         <h2 id="donation-title">选择生成模型</h2>
-        <p className="donation-copy">不同模型对应不同生成成本，按需要选择即可。</p>
-        <div className="donation-models" role="radiogroup" aria-label="选择生成模型">
-          {models.map((model) => (
+        <div className="donation-model-switch" role="radiogroup" aria-label="选择生成模型">
+          {switchModels.map((model) => (
             <button
               type="button"
               role="radio"
@@ -1327,13 +1324,11 @@ function DonationDialog({busy, error, models = fallbackDonationModels, defaultMo
               data-analytics-target={model.key}
               key={model.key}
             >
-              <span className="donation-model-copy"><strong>{model.label}</strong><small>{model.description}</small></span>
-              <span className="donation-model-price">¥{model.priceCny}</span>
+              {model.key === "lite" ? "Lite" : model.key === "pro" ? "Pro" : model.label}
             </button>
           ))}
         </div>
         <div className="donation-amount">
-          <span>建议打赏</span>
           <strong>¥1 ~ ¥3</strong>
         </div>
         <p className="donation-copy donation-support-copy">
@@ -1703,8 +1698,7 @@ function Landing({resumeOrderId, onRenderExample, onJobCreated, onOpenWork}) {
             ) : (
               <span className="photo-empty-state">
                 <UploadSimple weight="bold" aria-hidden="true" />
-                <strong>{dragging ? "松开即可放入照片" : "把照片拖进来"}</strong>
-                <small>也可以点击浏览，只支持一张照片</small>
+                <strong>{dragging ? "松开上传照片" : "上传照片"}</strong>
               </span>
             )}
           </button>
@@ -1755,7 +1749,7 @@ function Landing({resumeOrderId, onRenderExample, onJobCreated, onOpenWork}) {
         </a>
       </footer>
 
-      <AnimatePresence>{donationOpen ? <DonationDialog busy={submitting} error={error} models={health?.imageModels?.length ? health.imageModels : fallbackDonationModels} defaultModel={health?.defaultImageModel || "lite"} onClose={() => { if (!submitting) setDonationOpen(false); }} onContinue={continueAfterDonation} /> : null}</AnimatePresence>
+      <AnimatePresence>{donationOpen ? <DonationDialog busy={submitting} error={error} models={health?.imageModels?.length ? health.imageModels : fallbackDonationModels} onClose={() => { if (!submitting) setDonationOpen(false); }} onContinue={continueAfterDonation} /> : null}</AnimatePresence>
       <AnimatePresence>{previewProfile ? <ExamplePreviewDialog profile={previewProfile} onClose={() => setPreviewProfileId("")} onRender={(appearance) => onRenderExample(previewProfile.id, appearance)} /> : null}</AnimatePresence>
       <AnimatePresence>{historyOpen ? <WorkHistoryDialog onClose={() => setHistoryOpen(false)} onOpenWork={(work) => { setHistoryOpen(false); onOpenWork(work); }} /> : null}</AnimatePresence>
     </main>

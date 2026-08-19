@@ -5,10 +5,17 @@ import {fileURLToPath} from "node:url";
 import dotenv from "dotenv";
 import express from "express";
 import multer from "multer";
-import sharp from "sharp";
 import {createAdminAuth} from "./admin.mjs";
 import {createAnalyticsStore, summarizeEvents} from "./analytics.mjs";
 import {getImageTheme} from "./background.mjs";
+import {
+  FACE_ARCHIVE_NAME,
+  createFaceJpegBuffer,
+  ensureFaceDownloadArchive,
+  faceFilename,
+  writeFaceDownloadArchive,
+  writeFaceWebp,
+} from "./face-assets.mjs";
 import {
   defaultImageModelKey,
   findImageModel,
@@ -39,6 +46,7 @@ const jobs = new Map();
 const orders = new Map();
 const rateHits = new Map();
 const workQueue = [];
+const faceArchiveBuilds = new Map();
 let activeWork = 0;
 const maxConcurrentWork = Math.max(1, Number(process.env.MAX_CONCURRENT_JOBS || 1));
 const maxOrdersPerHour = Math.max(1, Number(process.env.MAX_ORDERS_PER_HOUR || 10));
@@ -57,8 +65,8 @@ const faceUpload = multer({
   storage: multer.memoryStorage(),
   limits: {fileSize: 9 * 1024 * 1024, files: 9, fields: 4},
   fileFilter: (_request, file, callback) => callback(
-    file.mimetype === "image/png" ? null : new Error("本地抠图结果必须是 PNG"),
-    file.mimetype === "image/png",
+    ["image/png", "image/webp"].includes(file.mimetype) ? null : new Error("本地抠图结果必须是 PNG 或 WebP"),
+    ["image/png", "image/webp"].includes(file.mimetype),
   ),
 });
 
@@ -67,25 +75,12 @@ const defaultAppearance = Object.freeze({
   patternStyle: "dots",
   decorations: true,
 });
-const faceFilename = (directory, index, extension) => path.join(
-  directory,
-  `face-${String(index).padStart(2, "0")}.${extension}`,
-);
-const writeFacePreview = async (input, output) => sharp(input)
-  .ensureAlpha()
-  .resize(960, 960, {
-    fit: "contain",
-    withoutEnlargement: true,
-    background: {r: 0, g: 0, b: 0, alpha: 0},
-  })
-  .webp({quality: 88, alphaQuality: 100, effort: 5, smartSubsample: true})
-  .toFile(output);
 const ensureFacePreview = async (directory, index) => {
   const preview = faceFilename(directory, index, "webp");
   try {
     await stat(preview);
   } catch {
-    await writeFacePreview(faceFilename(directory, index, "png"), preview);
+    await writeFaceWebp(faceFilename(directory, index, "png"), preview);
   }
   return preview;
 };
@@ -157,14 +152,15 @@ const publicJob = (job) => {
   const assetRevision = job.demoAssetsVersion
     ? `demo-${job.demoAssetsVersion}`
     : String(job.assetRevision || job.createdAt || "1");
+  const withAssetRevision = (src) => `${src}${src.includes("?") ? "&" : "?"}v=${encodeURIComponent(assetRevision)}`;
   if (Array.isArray(safe.avatars)) {
-    const withAssetRevision = (src) => `${src}${src.includes("?") ? "&" : "?"}v=${encodeURIComponent(assetRevision)}`;
     safe.avatars = safe.avatars.map((avatar) => ({
       ...avatar,
       src: withAssetRevision(avatar.src),
       ...(avatar.downloadSrc ? {downloadSrc: withAssetRevision(avatar.downloadSrc)} : {}),
     }));
   }
+  if (safe.downloadArchiveUrl) safe.downloadArchiveUrl = withAssetRevision(safe.downloadArchiveUrl);
   return safe;
 };
 
@@ -323,9 +319,10 @@ const restoreState = async () => {
         job.avatars = job.avatars.map((avatar, index) => ({
           ...avatar,
           src: `/generated/${job.id}/face-${String(index + 1).padStart(2, "0")}.webp`,
-          downloadSrc: `/generated/${job.id}/face-${String(index + 1).padStart(2, "0")}.png`,
+          downloadSrc: `/generated/${job.id}/face-${String(index + 1).padStart(2, "0")}.jpg`,
           label: `${job.title} 表情 ${index + 1}`,
         }));
+        job.downloadArchiveUrl = `/generated/${job.id}/${FACE_ARCHIVE_NAME}`;
         job.pageUrl = `/?view=${job.id}`;
         await persistJob(job);
       }
@@ -351,31 +348,22 @@ const ensureDemoJobs = async () => {
     const id = `demo-${profile.id}`;
     const directory = path.join(generatedRoot, id);
     const existing = jobs.get(id);
-    const demoAssetsVersion = 5;
+    const demoAssetsVersion = 6;
     await mkdir(directory, {recursive: true});
     const facePaths = [];
     for (let index = 0; index < profile.sources.length; index += 1) {
-      const target = faceFilename(directory, index + 1, "png");
-      const preview = faceFilename(directory, index + 1, "webp");
+      const target = faceFilename(directory, index + 1, "webp");
       facePaths.push(target);
       try {
         if (existing?.demoAssetsVersion !== demoAssetsVersion) throw new Error("refresh demo assets");
         await stat(target);
-        await stat(preview);
       } catch {
-        await sharp(profile.sources[index])
-          .ensureAlpha()
-          .resize(1365, 1365, {
-            fit: "contain",
-            withoutEnlargement: true,
-            background: {r: 0, g: 0, b: 0, alpha: 0},
-          })
-          .png({compressionLevel: 9, adaptiveFiltering: true})
-          .toFile(target);
-        await writeFacePreview(target, preview);
+        await writeFaceWebp(profile.sources[index], target);
       }
     }
     const themes = await Promise.all(facePaths.map(getImageTheme));
+    await ensureFaceDownloadArchive(directory, profile.title);
+    await Promise.all(Array.from({length: 9}, (_, index) => rm(faceFilename(directory, index + 1, "png"), {force: true})));
     const createdAt = existing?.createdAt || new Date().toISOString();
     const job = {
       ...existing,
@@ -389,6 +377,7 @@ const ensureDemoJobs = async () => {
       progress: 100,
       appearance: normalizeAppearance(existing?.appearance || defaultAppearance),
       avatars: buildAvatarManifest(id, profile.title, "", themes),
+      downloadArchiveUrl: `/generated/${id}/${FACE_ARCHIVE_NAME}`,
       pageUrl: `/?demo=${profile.id}`,
       permanent: true,
       expiresAt: null,
@@ -845,31 +834,23 @@ app.post("/api/jobs/:id/faces", faceUpload.array("faces", 9), async (request, re
   if (!job || !canProcessJob(request, job)) return response.status(404).json({error: "没有找到这个任务"});
   if (job.avatars?.length === 9) return response.json(publicJob(job));
   if (job.status !== "awaiting_client_processing") return response.status(409).json({error: "任务暂时不能接收抠图结果"});
-  if (request.files?.length !== 9) return response.status(400).json({error: "需要上传九张透明 PNG"});
+  if (request.files?.length !== 9) return response.status(400).json({error: "需要上传九张透明表情"});
 
   const directory = path.join(generatedRoot, job.id);
   try {
-    for (let index = 0; index < 9; index += 1) {
-      const original = faceFilename(directory, index + 1, "png");
-      await sharp(request.files[index].buffer)
-        .ensureAlpha()
-        .resize(1365, 1365, {
-          fit: "contain",
-          withoutEnlargement: true,
-          background: {r: 0, g: 0, b: 0, alpha: 0},
-        })
-        .png({compressionLevel: 9, adaptiveFiltering: true})
-        .toFile(original);
-      await writeFacePreview(original, faceFilename(directory, index + 1, "webp"));
-    }
-    const facePaths = Array.from({length: 9}, (_, index) => path.join(directory, `face-${String(index + 1).padStart(2, "0")}.png`));
+    const facePaths = Array.from({length: 9}, (_, index) => faceFilename(directory, index + 1, "webp"));
+    await Promise.all(request.files.map((file, index) => writeFaceWebp(file.buffer, facePaths[index])));
     const themes = await Promise.all(facePaths.map(getImageTheme));
+    await writeFaceDownloadArchive(directory, job.title);
+    await Promise.all(Array.from({length: 9}, (_, index) => rm(faceFilename(directory, index + 1, "png"), {force: true})));
     const avatars = buildAvatarManifest(job.id, job.title, publicOriginFor(request), themes);
     const next = await updateJob(job.id, {
       status: "ready",
-      stage: "透明表情和互动页已完成，视频可在浏览器本机生成",
+      stage: "轻量表情、白底 JPG 和互动页已完成，视频可在浏览器本机生成",
       progress: 100,
       avatars,
+      downloadArchiveUrl: `/generated/${job.id}/${FACE_ARCHIVE_NAME}`,
+      assetRevision: Date.now(),
       videoStatus: "local",
       pageUrl: `/?view=${job.id}`,
       permanent: true,
@@ -896,16 +877,46 @@ app.post("/api/public/jobs/:id/renders", async (request, response) => {
   return response.status(410).json({error: "视频已改为浏览器本机生成，请刷新页面后点击保存视频"});
 });
 
-app.get("/generated/:id/:filename", (request, response) => {
-  if (!jobs.has(request.params.id)) return response.status(404).end();
-  if (!/^(?:face-\d{2}\.(?:png|webp)|video\.mp4)$/.test(request.params.filename)) return response.status(404).end();
+app.get("/generated/:id/:filename", async (request, response) => {
+  const job = jobs.get(request.params.id);
+  if (!job) return response.status(404).end();
+  if (!/^(?:face-\d{2}\.(?:jpg|png|webp)|faces-jpg-v2\.zip|video\.mp4)$/.test(request.params.filename)) return response.status(404).end();
   response.setHeader("Cache-Control", request.params.filename === "video.mp4" ? "private, no-cache" : "private, max-age=31536000, immutable");
-  const filename = path.join(generatedRoot, request.params.id, request.params.filename);
+  const directory = path.join(generatedRoot, request.params.id);
+  const filename = path.join(directory, request.params.filename);
+  const title = String(job.title || "Tiny Moods").replace(/[<>/\\]/g, "").trim() || "Tiny Moods";
+
+  if (request.params.filename === FACE_ARCHIVE_NAME) {
+    try {
+      let archiveTask = faceArchiveBuilds.get(job.id);
+      if (!archiveTask) {
+        archiveTask = ensureFaceDownloadArchive(directory, title).finally(() => faceArchiveBuilds.delete(job.id));
+        faceArchiveBuilds.set(job.id, archiveTask);
+      }
+      const archive = await archiveTask;
+      return response.download(archive, `${title}-9张白底表情.zip`);
+    } catch {
+      return response.status(404).end();
+    }
+  }
+
+  const jpegMatch = request.params.filename.match(/^face-(\d{2})\.jpg$/);
+  if (jpegMatch) {
+    try {
+      const source = faceFilename(directory, Number(jpegMatch[1]), "webp");
+      const jpeg = await createFaceJpegBuffer(source);
+      response.type("jpeg");
+      response.setHeader("Content-Disposition", `inline; filename="face-${jpegMatch[1]}.jpg"`);
+      return response.send(jpeg);
+    } catch {
+      return response.status(404).end();
+    }
+  }
+
   if (request.params.filename === "video.mp4" && request.query.download === "1") {
-    const title = String(jobs.get(request.params.id)?.title || "Tiny Moods").replace(/[<>/\\]/g, "").trim() || "Tiny Moods";
     return response.download(filename, `${title}-Tiny-Moods.mp4`);
   }
-  response.sendFile(filename);
+  return response.sendFile(filename);
 });
 
 if (process.env.NODE_ENV === "production") {

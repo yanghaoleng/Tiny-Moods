@@ -1,8 +1,8 @@
-const OUTPUT_SIZE = 1365;
+const OUTPUT_SIZE = 1080;
 const CELL_INSET_RATIO = 0.006;
 
-const canvasToPng = (canvas) => new Promise((resolve, reject) => {
-  canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("PNG 导出失败")), "image/png");
+const canvasToWebp = (canvas) => new Promise((resolve, reject) => {
+  canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("WebP 导出失败")), "image/webp", 0.9);
 });
 
 const loadImage = async (blob) => {
@@ -73,7 +73,7 @@ export async function splitAndMatteSheet(sheetBlob, onProgress = () => {}) {
       const pixels = context.getImageData(0, 0, OUTPUT_SIZE, OUTPUT_SIZE);
       const transparent = await processPixels(worker, pixels, index);
       context.putImageData(transparent, 0, 0);
-      results.push(await canvasToPng(canvas));
+      results.push(await canvasToWebp(canvas));
       onProgress(index + 1, 9);
     }
     return results;
