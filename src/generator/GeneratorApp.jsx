@@ -27,8 +27,8 @@ const MAX_FILE_SIZE = 12 * 1024 * 1024;
 const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 const defaultAppearance = {backgroundMode: "color", patternStyle: "dots", decorations: true};
 const fallbackDonationModels = [
-  {key: "pro", label: "Seedream 5.0 Pro", description: "更高画质与复杂指令表现", size: "2144x2144", priceCny: "0.60"},
   {key: "lite", label: "Seedream 5.0 Lite", description: "日常生成，成本更低", size: "2144x2144", priceCny: "0.22"},
+  {key: "pro", label: "Seedream 5.0 Pro", description: "更高画质与复杂指令表现", size: "2144x2144", priceCny: "0.60"},
 ];
 const donationThanksCopies = [
   "谢谢有品位的您！",
@@ -1287,13 +1287,13 @@ function ExamplePreviewDialog({profile, onClose, onRender}) {
   );
 }
 
-function DonationDialog({busy, error, models = fallbackDonationModels, defaultModel = "pro", onClose, onContinue}) {
+function DonationDialog({busy, error, models = fallbackDonationModels, defaultModel = "lite", onClose, onContinue}) {
   const reduceMotion = useReducedMotion();
   const [method, setMethod] = useState("wechat");
   const [wechatCopied, setWechatCopied] = useState(false);
   const [supportCopy] = useState(() => `生成图片会产生费用，不需要给太多。${donationThanksCopies[Math.floor(Math.random() * donationThanksCopies.length)]}`);
   const [selectedModelKey, setSelectedModelKey] = useState(() => (
-    models.some((model) => model.key === defaultModel) ? defaultModel : models[0]?.key || "pro"
+    models.some((model) => model.key === defaultModel) ? defaultModel : models[0]?.key || "lite"
   ));
   const selectedModel = models.find((model) => model.key === selectedModelKey) || models[0] || fallbackDonationModels[0];
 
@@ -1755,7 +1755,7 @@ function Landing({resumeOrderId, onRenderExample, onJobCreated, onOpenWork}) {
         </a>
       </footer>
 
-      <AnimatePresence>{donationOpen ? <DonationDialog busy={submitting} error={error} models={health?.imageModels?.length ? health.imageModels : fallbackDonationModels} defaultModel={health?.defaultImageModel || "pro"} onClose={() => { if (!submitting) setDonationOpen(false); }} onContinue={continueAfterDonation} /> : null}</AnimatePresence>
+      <AnimatePresence>{donationOpen ? <DonationDialog busy={submitting} error={error} models={health?.imageModels?.length ? health.imageModels : fallbackDonationModels} defaultModel={health?.defaultImageModel || "lite"} onClose={() => { if (!submitting) setDonationOpen(false); }} onContinue={continueAfterDonation} /> : null}</AnimatePresence>
       <AnimatePresence>{previewProfile ? <ExamplePreviewDialog profile={previewProfile} onClose={() => setPreviewProfileId("")} onRender={(appearance) => onRenderExample(previewProfile.id, appearance)} /> : null}</AnimatePresence>
       <AnimatePresence>{historyOpen ? <WorkHistoryDialog onClose={() => setHistoryOpen(false)} onOpenWork={(work) => { setHistoryOpen(false); onOpenWork(work); }} /> : null}</AnimatePresence>
     </main>

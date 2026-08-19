@@ -16,16 +16,16 @@ const liteModel = () => ({
   priceCny: process.env.SEEDREAM_LITE_PRICE_CNY || "0.22",
 });
 
-export const imageModelOptions = () => [proModel(), liteModel()];
+export const imageModelOptions = () => [liteModel(), proModel()];
 
 export const defaultImageModelKey = () => (
-  process.env.SEEDREAM_DEFAULT_TIER === "lite" ? "lite" : "pro"
+  process.env.SEEDREAM_DEFAULT_TIER === "pro" ? "pro" : "lite"
 );
 
 export const findImageModel = (key) => imageModelOptions().find((option) => option.key === key) || null;
 
 export const resolveImageModel = (key) => (
-  findImageModel(key) || findImageModel(defaultImageModelKey()) || proModel()
+  findImageModel(key) || findImageModel(defaultImageModelKey()) || liteModel()
 );
 
 export const publicImageModelOptions = () => imageModelOptions().map(({

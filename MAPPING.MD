@@ -9,7 +9,7 @@
 | 随机相机图标 / 点一下换相机 | 导航左侧保留的 9 个扁平透明相机；进入随机，点击品牌切换且不连续重复 | `CameraIcon` / `cameraIconConcepts` / `createCameraIconVariant` / `createInitialCameraIconVariant` / `tiny-moods:camera-icon` / `.camera-icon-*` |
 | 网页小图标 / 每次打开不一样 | 从 9 套 App 相机色板中随机选择的 SVG Favicon，避免与上次重复 | `installRandomFavicon` / `tiny-moods:favicon-variant` / `public/favicon.svg` / `data-favicon-variant` |
 | 图标生成参考稿 | 9 个图像生成方向的原始探索图，不直接用于页面透明图标 | `output/icon-concepts/flat-camera-generated/` |
-| App Icon 旁边的文字 / 网页标题 | 英文动态品牌字标 `Tiny Moods` | `BrandButton` / `.brand-glyph-bar` / `.brand-glyph` |
+| App Icon 旁边的文字 / 网页标题 / 左上角标题 | 英文动态品牌字标 `Tiny Moods`；首页整体下移 `10px` | `BrandButton` / `.landing-theme .generator-brand` / `.brand-glyph-bar` / `.brand-glyph` |
 | Tiny 黑色 / Moods 彩色 | 固定词与随机配色词 | `brandFixedLetters` / `brandMoodLetters` / `createMoodPalette` |
 | 跟着字体边界走的色块 | 上伸、x 高度、下伸三类字形底板 | `brandMetricClass` / `.is-ascender` / `.is-xheight` / `.is-descender` |
 | 下边四个头 | 上传区下方的动态案例 | `ExamplePortrait` / `exampleProfiles` / `.example-gallery` |
@@ -26,7 +26,7 @@
 | 案例浮窗 | 桌面 3:4 预览浮窗、手机底部半弹窗 | `ExamplePreviewDialog` / `embedded` |
 | 日系相册 / C 方案 | 首页固定的明亮轻日系视觉 | `.landing-theme` |
 | 打赏弹窗 | 免费生成前说明层 | `DonationDialog` |
-| 选模型 / Pro 和 Lite | 打赏层中的生成模型单选组 | `fallbackDonationModels` / `.donation-models` / `selectedModelKey` / `image-models.mjs` |
+| 选模型 / Pro 和 Lite / 默认 Lite | 打赏层中的生成模型单选组；默认 Lite，提交所选 `model` 键 | `fallbackDonationModels` / `.donation-models` / `selectedModelKey` / `image-models.mjs` |
 | ¥0.60 / ¥0.22 / 打赏金额 | 随模型切换的建议打赏金额 | `.donation-model-price` / `.donation-amount` / `suggestedDonationCny` |
 | 价格下面的小字 / 感谢文案 | 建议打赏金额下方的支持感谢语 | `.donation-support-copy` / `Calligraph` |
 | ¥1 ~ ¥3 | 固定的自愿打赏建议区间 | `.donation-amount` |

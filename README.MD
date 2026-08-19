@@ -10,7 +10,7 @@
 
 ## 核心功能
 
-- 生成前在打赏层选择 Seedream 5.0 Pro（模型成本 `¥0.60`）或 Lite（模型成本 `¥0.22`）；服务端白名单校验并按所选模型发起生成
+- 生成前在打赏层选择 Seedream 5.0 Lite（默认，模型成本 `¥0.22`）或 Pro（模型成本 `¥0.60`）；服务端白名单校验并严格按所选模型发起生成
 - 打赏建议固定显示 `¥1 ~ ¥3`；10 条简短感谢文案每次随机出现，Calligraph 负责逐字入场，并遵循系统减少动效设置
 - 打赏层提供作者微信 `yanghaoleng` 一键复制，用于收集问题和建议
 - Seedream 生成无缝 3×3 九宫格；每格只允许头顶到下巴，禁止脖子、肩膀、衣服、手和身体
@@ -65,7 +65,7 @@
 
 - 前端：Vite、React、Motion、Calligraph、UI SFX / Web Audio、Canvas 2D、Web Worker、Remotion Web Renderer
 - 服务端：Express、Multer、Sharp，负责模型密钥、任务/订单状态、永久素材、匿名埋点和运营后台；不渲染视频
-- 模型：火山方舟 Pro `doubao-seedream-5-0-pro-260628`；Lite `doubao-seedream-5-0-260128`；模型 ID、尺寸和价格均可由服务端环境变量覆盖
+- 模型：火山方舟 Lite `doubao-seedream-5-0-260128`（默认）；Pro `doubao-seedream-5-0-pro-260628`；模型 ID、尺寸和价格均可由服务端环境变量覆盖
 - 视频：1080×1920 布局按 `2/3` 缩放输出为 720×1280、30fps、约 21.27 秒、9 个造型；优先 H.264/AAC MP4
 - 数据：生产 `DATA_ROOT=/var/lib/9face`；作品资源使用同源相对地址，埋点按北京时间写入 `analytics/events/YYYY-MM-DD.jsonl`
 - 匿名身份：Cookie `tiny_moods_visitor` 仅保存随机访客 ID，HttpOnly、SameSite=Lax、有效期一年；照片、名字和作品访问令牌不写入 Cookie

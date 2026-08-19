@@ -1463,7 +1463,14 @@
   backdrop-filter: blur(16px);
 }
 
-.landing-theme .generator-brand { flex: 0 0 auto; }
+.landing-theme .generator-brand {
+  flex: 0 0 auto;
+  transform: translateY(10px);
+}
+
+.landing-theme .generator-brand:active {
+  transform: translateY(11px) scale(0.985);
+}
 
 .landing-nav-tools {
   display: flex;
