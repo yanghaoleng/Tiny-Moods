@@ -134,6 +134,47 @@ button {
   text-shadow: 0 4px 0 #fff4cc, 0 10px 0 rgb(135 61 74 / 0.16);
 }
 
+.wechat-audio-cover-start {
+  position: fixed;
+  left: 50%;
+  bottom: max(92px, calc(env(safe-area-inset-bottom) + 86px));
+  z-index: 36;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 50px;
+  padding: 11px 20px;
+  border: 3px solid rgb(255 255 255 / 0.94);
+  border-radius: 999px;
+  color: var(--accent-deep, #633c33);
+  background: color-mix(in srgb, var(--page-bg, #ffe291) 78%, white);
+  box-shadow:
+    0 7px 0 color-mix(in srgb, var(--accent-deep, #633c33) 18%, transparent),
+    inset 0 1px 0 rgb(255 255 255 / 0.94);
+  font-size: 0.92rem;
+  font-weight: 950;
+  white-space: nowrap;
+  cursor: pointer;
+  translate: -50% 0;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.wechat-audio-cover-start svg {
+  width: 20px;
+  height: 20px;
+}
+
+.wechat-audio-cover-start:active {
+  transform: translateY(3px) scale(0.97);
+}
+
+.wechat-audio-cover-start:focus-visible {
+  outline: 3px solid var(--accent-deep, #633c33);
+  outline-offset: 4px;
+}
+
 @keyframes experience-circle-open {
   from { clip-path: circle(0 at 50% 50%); }
   to { clip-path: circle(150vmax at 50% 50%); }
@@ -515,6 +556,13 @@ button {
   box-shadow: 0 4px 0 rgb(0 0 0 / 0.14);
 }
 
+.wechat-audio-cover-start.is-white {
+  border-color: rgb(0 0 0 / 0.72);
+  color: #000;
+  background: #fff;
+  box-shadow: 0 4px 0 rgb(0 0 0 / 0.14);
+}
+
 .stage.background-white .experience-display-toggle {
   color: #000;
 }
@@ -583,6 +631,13 @@ button {
   }
 
   .experience-top-button.experience-home { width: 38px; }
+
+  .wechat-audio-cover-start {
+    bottom: max(82px, calc(env(safe-area-inset-bottom) + 74px));
+    min-height: 46px;
+    padding: 10px 17px;
+    font-size: 0.84rem;
+  }
 
   .experience-display-toggle {
     gap: 6px;

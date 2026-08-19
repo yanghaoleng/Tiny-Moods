@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Ghost } from "@phosphor-icons/react/Ghost";
 import { House } from "@phosphor-icons/react/House";
+import { Play } from "@phosphor-icons/react/Play";
 import { SpeakerHigh } from "@phosphor-icons/react/SpeakerHigh";
 import { SpeakerSlash } from "@phosphor-icons/react/SpeakerSlash";
 import HalftoneRippleBackground from "./HalftoneRippleBackground";
@@ -50,6 +51,8 @@ const stickerSlots = [
 
 const THEME_TRANSITION_DURATION = 1200;
 const AUTO_CHANGE_INTERVAL = 1500;
+const isWeChatBrowser = () =>
+  typeof navigator !== "undefined" && /MicroMessenger/i.test(navigator.userAgent);
 const carouselBackgrounds = [
   {bg: "#f8e9ee", accent: "#d98ba5"},
   {bg: "#eaf4fa", accent: "#78afd0"},
@@ -154,6 +157,7 @@ export default function JennieExperience({
   const [imageFailed, setImageFailed] = useState(false);
   const [musicEnabled, setMusicEnabled] = useState(true);
   const [audioPlaying, setAudioPlaying] = useState(false);
+  const [wechatAudioConsent, setWechatAudioConsent] = useState(() => !isWeChatBrowser());
   const [introVisible, setIntroVisible] = useState(showIntro);
   const rippleId = useRef(0);
   const lookRef = useRef(0);
@@ -196,13 +200,12 @@ export default function JennieExperience({
     [],
   );
 
-  const tryStartAudio = useCallback(async () => {
+  const requestAudioPlay = useCallback(async ({allowWhenDisabled = false} = {}) => {
     const audio = audioRef.current;
-    if (!audio || !musicEnabled) return false;
+    if (!audio || (!musicEnabled && !allowWhenDisabled)) return false;
 
     try {
       await audio.play();
-      setAudioPlaying(true);
       return true;
     } catch {
       setAudioPlaying(false);
@@ -211,19 +214,22 @@ export default function JennieExperience({
   }, [musicEnabled]);
 
   useEffect(() => {
-    void tryStartAudio();
-  }, [bgmUrl, tryStartAudio]);
+    if (!wechatAudioConsent) return;
+    void requestAudioPlay();
+  }, [bgmUrl, requestAudioPlay, wechatAudioConsent]);
 
   useEffect(() => {
-    if (!musicEnabled || audioPlaying) return undefined;
-    const unlockAudio = () => void tryStartAudio();
+    if (!musicEnabled || audioPlaying || !wechatAudioConsent) return undefined;
+    const unlockAudio = () => void requestAudioPlay();
     window.addEventListener("pointerdown", unlockAudio, {capture: true, once: true});
+    window.addEventListener("touchstart", unlockAudio, {capture: true, once: true});
     window.addEventListener("keydown", unlockAudio, {capture: true, once: true});
     return () => {
       window.removeEventListener("pointerdown", unlockAudio, true);
+      window.removeEventListener("touchstart", unlockAudio, true);
       window.removeEventListener("keydown", unlockAudio, true);
     };
-  }, [audioPlaying, musicEnabled, tryStartAudio]);
+  }, [audioPlaying, musicEnabled, requestAudioPlay, wechatAudioConsent]);
 
   const toggleMusic = useCallback(async () => {
     const audio = audioRef.current;
@@ -235,13 +241,15 @@ export default function JennieExperience({
       return;
     }
     setMusicEnabled(true);
-    try {
-      await audio.play();
-      setAudioPlaying(true);
-    } catch {
-      setAudioPlaying(false);
-    }
-  }, [audioPlaying]);
+    setWechatAudioConsent(true);
+    await requestAudioPlay({allowWhenDisabled: true});
+  }, [audioPlaying, requestAudioPlay]);
+
+  const startWechatAudio = useCallback(async () => {
+    setMusicEnabled(true);
+    setWechatAudioConsent(true);
+    await requestAudioPlay({allowWhenDisabled: true});
+  }, [requestAudioPlay]);
 
   const changeLook = useCallback((event) => {
     const id = rippleId.current + 1;
@@ -295,17 +303,19 @@ export default function JennieExperience({
     "--page-bg": appearance.backgroundMode === "white" ? "#ffffff" : background.bg,
   };
   const wipeBackground = themeWipe ? carouselBackgrounds[themeWipe.look % carouselBackgrounds.length] : null;
+  const showWechatAudioStart = musicEnabled && !wechatAudioConsent;
 
   return (
     <>
       <audio
         ref={audioRef}
         src={bgmUrl}
-        autoPlay
+        autoPlay={musicEnabled && wechatAudioConsent}
         loop
         preload="auto"
-        onPlay={() => setAudioPlaying(true)}
+        onPlaying={() => setAudioPlaying(true)}
         onPause={() => setAudioPlaying(false)}
+        onError={() => setAudioPlaying(false)}
       />
       <AnimatePresence>
         {introVisible ? (
@@ -324,6 +334,26 @@ export default function JennieExperience({
               <motion.span initial={{opacity: 0, y: 46, rotate: 4, scale: 0.84}} animate={{opacity: 1, y: 0, rotate: 0, scale: 1}} transition={{duration: 0.72, delay: 0.52, ease: [0.34, 1.56, 0.64, 1]}}>可爱瞬间</motion.span>
             </div>
           </motion.div>
+        ) : null}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showWechatAudioStart ? (
+          <motion.button
+            type="button"
+            className={`wechat-audio-cover-start ${appearance.backgroundMode === "white" ? "is-white" : ""}`}
+            style={stageStyle}
+            initial={{opacity: 0, y: 14, scale: 0.92}}
+            animate={{opacity: 1, y: 0, scale: 1}}
+            exit={{opacity: 0, y: -8, scale: 0.96}}
+            transition={{duration: reduceMotion ? 0 : 0.24, ease: [0.34, 1.56, 0.64, 1]}}
+            onClick={startWechatAudio}
+            data-uisfx="toggle-on"
+            data-analytics-action="wechat_audio_start"
+            aria-label="播放背景音乐"
+          >
+            <Play weight="fill" aria-hidden="true" />
+            <span>播放音乐</span>
+          </motion.button>
         ) : null}
       </AnimatePresence>
       <main ref={stageRef} className={`stage ${embedded ? "is-embedded" : ""} ${appearance.backgroundMode === "white" ? "background-white" : ""} ${showIntro && !reduceMotion ? "stage-intro-open" : ""}`} style={stageStyle}>

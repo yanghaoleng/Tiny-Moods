@@ -49,6 +49,7 @@
 | 装饰开关 | 互动页顶部的贴纸显示切换，作品主人设置持久化 | `.experience-display-controls` / `decorations` / `stickerSlots` / `PATCH /api/jobs/:id/appearance` |
 | 主页图标 / 小房子 | 互动页左上角返回主页入口 | `.experience-top-actions` / `.experience-home` / `House` / `onExit` |
 | 背景音乐开关 | 互动页左上角的 BGM 播放与暂停 | `.experience-bgm-toggle` / `musicEnabled` / `audioPlaying` / `toggleMusic` |
+| 微信封面播放按钮 | 微信内置浏览器作品封面上的“播放音乐”真实点击入口 | `.wechat-audio-cover-start` / `wechatAudioConsent` / `startWechatAudio` / `wechat_audio_start` |
 | 保存视频（测试） | 保存原图弹层底部的无填充次要按钮、本机渲染入口 | `.share-video-section` / `.share-save-video` / `?render=1` |
 | 渲染进度页 | 本机视频生成状态 | `LocalVideoRenderPage` |
 | 本机渲染器 | 按需加载 Remotion Web Renderer | `localVideoRender.js` / `renderVideoLocally` |
@@ -65,7 +66,7 @@
 | 人物白边 | Alpha 通道描边 | `.portrait` 的 `drop-shadow` |
 | 波纹 | 半调点阵高亮扩散 | `HalftoneRippleBackground` |
 | 自动慢慢换一个 / Hover 不打断 | 独立于悬停状态的自动换装计时器 | `AUTO_CHANGE_INTERVAL` / `changeLook`；头像按钮无 `whileHover` |
-| 立即播放音乐 / 首次点击补播 / 微信里开一下又关 | BGM 自动播放、微信桥接兼容与浏览器策略回退 | `autoPlay` / `preload="auto"` / `tryStartAudio` / `WeixinJSBridgeReady` / `playing` |
+| 立即播放音乐 / 首次点击补播 / 微信里开一下又关 | BGM 自动播放、微信显式点击播放与浏览器策略回退 | `autoPlay` / `preload="auto"` / `requestAudioPlay` / `wechatAudioConsent` / `playing` |
 | 互动 WebP / 抠图后图片 | 九张 1080px 透明 WebP，只用于网页互动、二维码和视频 | `avatar.src` / `writeFaceWebp` / `/generated/:id/face-XX.webp` |
 | 全部图片压缩 | 静态 PNG 批量转 WebP | `npm run images:optimize` / `scripts/optimize-static-images.mjs` |
 | 图片长缓存 / 打开更快 | 指纹静态资源和作品 WebP 的一年不可变缓存 | `/assets` / `express.static(..., {maxAge: "1y", immutable: true})` / `/generated/:id/face-XX.webp` |
