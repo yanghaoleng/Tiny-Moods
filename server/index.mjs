@@ -199,6 +199,10 @@ const publicAdminEvent = (event) => ({
   durationMs: event.durationMs,
   properties: event.properties,
   device: event.device,
+  browser: event.browser,
+  os: event.os,
+  trafficSource: event.trafficSource,
+  location: event.location,
   occurredAt: event.occurredAt,
   receivedAt: event.receivedAt,
 });
@@ -528,6 +532,7 @@ app.get("/api/admin/dashboard", requireAdmin, async (request, response) => {
       visibleSeconds: analyticsSummary.visibleSeconds,
     },
     topActions: analyticsSummary.topActions,
+    acquisition: analyticsSummary.acquisition,
     daily: analyticsSummary.daily,
     jobs: pagedJobs,
     pagination: {
@@ -617,11 +622,11 @@ app.get("/api/works/search", (request, response) => {
   if (!rateAllowed(`work-search:${ip}`, 120)) return response.status(429).json({error: "查询太频繁，请稍后再试"});
   const normalizedName = name.toLocaleLowerCase("zh-CN");
   const items = [...jobs.values()]
-    .filter((job) => !job.demo && ["ready", "awaiting_client_processing"].includes(job.status) && String(job.title || "").normalize("NFKC").trim().toLocaleLowerCase("zh-CN") === normalizedName)
+    .filter((job) => !job.demo && String(job.title || "").normalize("NFKC").trim().toLocaleLowerCase("zh-CN") === normalizedName)
     .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))
     .map((job) => ({
       ...historyJob(job),
-      ...(job.status === "awaiting_client_processing" ? {resumeToken: searchResumeTokenFor(job)} : {}),
+      ...(!["ready", "failed"].includes(job.status) ? {resumeToken: searchResumeTokenFor(job)} : {}),
     }));
   response.setHeader("Cache-Control", "no-store");
   response.json({items});
