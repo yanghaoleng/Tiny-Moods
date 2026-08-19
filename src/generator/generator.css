@@ -1472,6 +1472,10 @@
   transform: translateY(11px) scale(0.985);
 }
 
+.landing-theme .generator-brand-mark {
+  transform: translateY(-10px);
+}
+
 .landing-nav-tools {
   display: flex;
   align-items: center;

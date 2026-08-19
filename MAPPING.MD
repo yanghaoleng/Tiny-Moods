@@ -6,7 +6,7 @@
 | 首页大标题 / 随机文案 | 11 句随机 Typer 波浪主标题，点击换一句；空间不足时从逗号后换行并隐藏行尾逗号；整体下移 10px | `landingHeadlines` / `headline` / `showNextHeadline` / `TyperHeadline` / `wrapped` / `.landing-heading` / `.typer-headline-button` / `.typer-flow` / `.typer-phrase` / `.typer-comma` |
 | 黑色鼠标 / 放大指针 | 桌面端 37px 自定义实心指针，按下位移 2px | `EmotionCursorTrail` / `.emotion-cursor` |
 | Tiny Moods Logo / 九格拍立得 Logo | 品牌按钮和相机图标 | `BrandButton` / `app-icon.webp` |
-| 随机相机图标 / 点一下换相机 | 导航左侧保留的 9 个扁平透明相机；进入随机，点击品牌切换且不连续重复 | `CameraIcon` / `cameraIconConcepts` / `createCameraIconVariant` / `createInitialCameraIconVariant` / `tiny-moods:camera-icon` / `.camera-icon-*` |
+| 随机相机图标 / 点一下换相机 / 图标往上移 | 导航左侧保留的 9 个扁平透明相机；进入随机，点击品牌切换且不连续重复；首页相对字标上移 `10px` | `CameraIcon` / `cameraIconConcepts` / `createCameraIconVariant` / `createInitialCameraIconVariant` / `tiny-moods:camera-icon` / `.landing-theme .generator-brand-mark` / `.camera-icon-*` |
 | 网页小图标 / 每次打开不一样 | 从 9 套 App 相机色板中随机选择的 SVG Favicon，避免与上次重复 | `installRandomFavicon` / `tiny-moods:favicon-variant` / `public/favicon.svg` / `data-favicon-variant` |
 | 图标生成参考稿 | 9 个图像生成方向的原始探索图，不直接用于页面透明图标 | `output/icon-concepts/flat-camera-generated/` |
 | App Icon 旁边的文字 / 网页标题 / 左上角标题 | 英文动态品牌字标 `Tiny Moods`；首页整体下移 `10px` | `BrandButton` / `.landing-theme .generator-brand` / `.brand-glyph-bar` / `.brand-glyph` |
