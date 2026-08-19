@@ -753,6 +753,7 @@ app.get("/generated/:id/:filename", (request, response) => {
 
 if (process.env.NODE_ENV === "production") {
   const distRoot = path.join(projectRoot, "dist");
+  app.use("/assets", express.static(path.join(distRoot, "assets"), {index: false, maxAge: "1y", immutable: true}));
   app.use(express.static(distRoot, {index: false}));
   app.get(/^(?!\/api\/|\/generated\/).*/, (_request, response) => response.sendFile(path.join(distRoot, "index.html")));
 } else {
