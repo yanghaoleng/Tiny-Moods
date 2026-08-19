@@ -1,0 +1,31 @@
+[Unit]
+Description=Tiny Moods generator
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/9face/current
+Environment=NODE_ENV=production
+Environment=PORT=8095
+Environment=PUBLIC_ORIGIN=https://tinymoods.mikeywa.site
+Environment=ENV_FILE=/etc/9face.env
+Environment=DATA_ROOT=/var/lib/9face
+Environment=PAYMENT_PROVIDER=xunhu
+Environment=REMOTION_CONCURRENCY=1
+Environment=MAX_CONCURRENT_JOBS=1
+Environment=JOB_RETENTION_HOURS=168
+ExecStart=/home/ubuntu/.nvm/versions/node/v22.22.3/bin/node /opt/9face/current/server/index.mjs
+Restart=on-failure
+RestartSec=4
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/var/lib/9face
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target

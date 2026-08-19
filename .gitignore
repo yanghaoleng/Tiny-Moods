@@ -1,0 +1,8 @@
+node_modules/
+dist/
+generated/
+orders/
+data/
+output/
+.env.local
+.DS_Store

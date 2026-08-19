@@ -1,0 +1,7 @@
+export const VIDEO_FPS = 30;
+export const INTRO_FRAMES = 96;
+export const LOOK_FRAMES = VIDEO_FPS * 2;
+export const LOOK_COUNT = 100;
+export const SHORT_LOOK_COUNT = 9;
+export const VIDEO_FRAMES = INTRO_FRAMES + LOOK_FRAMES * LOOK_COUNT;
+export const SHORT_VIDEO_FRAMES = INTRO_FRAMES + LOOK_FRAMES * SHORT_LOOK_COUNT;

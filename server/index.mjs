@@ -1,0 +1,745 @@
+import crypto from "node:crypto";
+import {mkdir, readdir, readFile, rename, rm, stat, writeFile} from "node:fs/promises";
+import path from "node:path";
+import {fileURLToPath} from "node:url";
+import dotenv from "dotenv";
+import express from "express";
+import multer from "multer";
+import sharp from "sharp";
+import {createAdminAuth} from "./admin.mjs";
+import {createAnalyticsStore, summarizeEvents} from "./analytics.mjs";
+import {getImageTheme} from "./background.mjs";
+import {buildAvatarManifest, runGenerationPipeline} from "./pipeline.mjs";
+import {
+  PAYMENT_AMOUNT_CNY,
+  createPayment,
+  getPaymentStatus,
+  hashAccessToken,
+  verifyAccessToken,
+  verifyXunhuCallback,
+} from "./payment.mjs";
+
+const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+dotenv.config({path: process.env.ENV_FILE || path.join(projectRoot, ".env.local")});
+
+const app = express();
+const port = Number(process.env.PORT || 4173);
+const dataRoot = process.env.DATA_ROOT ? path.resolve(process.env.DATA_ROOT) : projectRoot;
+const generatedRoot = path.join(dataRoot, "generated");
+const ordersRoot = path.join(dataRoot, "orders");
+const adminAuth = createAdminAuth();
+const analytics = createAnalyticsStore({dataRoot, salt: process.env.ANALYTICS_SALT});
+const jobs = new Map();
+const orders = new Map();
+const rateHits = new Map();
+const workQueue = [];
+let activeWork = 0;
+const maxConcurrentWork = Math.max(1, Number(process.env.MAX_CONCURRENT_JOBS || 1));
+const maxOrdersPerHour = Math.max(1, Number(process.env.MAX_ORDERS_PER_HOUR || 10));
+const retentionMs = Number(process.env.JOB_RETENTION_HOURS || 168) * 60 * 60 * 1000;
+const orderExpiryMs = Number(process.env.ORDER_EXPIRY_MINUTES || 30) * 60 * 1000;
+const imageMimeTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+const photoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {fileSize: 12 * 1024 * 1024, files: 1},
+  fileFilter: (_request, file, callback) => callback(
+    imageMimeTypes.has(file.mimetype) ? null : new Error("仅支持 JPG、PNG 或 WebP 图片"),
+    imageMimeTypes.has(file.mimetype),
+  ),
+});
+const faceUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {fileSize: 9 * 1024 * 1024, files: 9, fields: 4},
+  fileFilter: (_request, file, callback) => callback(
+    file.mimetype === "image/png" ? null : new Error("本地抠图结果必须是 PNG"),
+    file.mimetype === "image/png",
+  ),
+});
+
+const defaultAppearance = Object.freeze({
+  backgroundMode: "color",
+  patternStyle: "dots",
+  decorations: true,
+});
+const demoProfiles = [
+  {
+    id: "jennie",
+    title: "Jennie",
+    sources: Array.from({length: 9}, (_, index) => path.join(projectRoot, "public", "examples", "jennie", `face-${String(index + 1).padStart(2, "0")}.webp`)),
+  },
+  {
+    id: "tuanzi",
+    title: "团子",
+    sources: Array.from({length: 9}, (_, index) => path.join(projectRoot, "public", "examples", "tuanzi", `face-${String(index + 1).padStart(2, "0")}.webp`)),
+  },
+  {
+    id: "sun-conure",
+    title: "耙耙柑",
+    sources: Array.from({length: 9}, (_, index) => path.join(projectRoot, "public", "examples", "sun-conure", `face-${String(index + 1).padStart(2, "0")}.webp`)),
+  },
+  {
+    id: "yangshi-tuotuo",
+    title: "羊石坨坨",
+    sources: Array.from({length: 9}, (_, index) => path.join(projectRoot, "public", "examples", "yangshi-tuotuo", `face-${String(index + 1).padStart(2, "0")}.webp`)),
+  },
+];
+const patternStyles = new Set(["auto", "dots", "checks", "petals", "confetti", "none"]);
+
+const normalizeAppearance = (value = {}) => ({
+  backgroundMode: value.backgroundMode === "white" ? "white" : "color",
+  patternStyle: patternStyles.has(value.patternStyle) ? value.patternStyle : "dots",
+  decorations: value.decorations !== false,
+});
+
+const publicJob = (job) => {
+  if (!job) return null;
+  const {
+    internalError: _internalError,
+    accessTokenHash: _accessTokenHash,
+    videoUrl: _videoUrl,
+    renderError: _renderError,
+    ...safe
+  } = job;
+  safe.videoStatus = "local";
+  const assetRevision = job.demoAssetsVersion
+    ? `demo-${job.demoAssetsVersion}`
+    : String(job.assetRevision || job.createdAt || "1");
+  if (Array.isArray(safe.avatars)) {
+    safe.avatars = safe.avatars.map((avatar) => ({
+      ...avatar,
+      src: `${avatar.src}${avatar.src.includes("?") ? "&" : "?"}v=${encodeURIComponent(assetRevision)}`,
+    }));
+  }
+  return safe;
+};
+
+const publicOrder = (order) => {
+  if (!order) return null;
+  const {accessTokenHash: _accessTokenHash, providerOrderId: _providerOrderId, ...safe} = order;
+  return safe;
+};
+
+const publicAdminEvent = (event) => ({
+  id: event.id,
+  name: event.name,
+  sessionId: event.sessionId,
+  page: event.page,
+  jobId: event.jobId,
+  demoId: event.demoId,
+  durationMs: event.durationMs,
+  properties: event.properties,
+  device: event.device,
+  occurredAt: event.occurredAt,
+  receivedAt: event.receivedAt,
+});
+
+const adminJob = (job, request, analyticsMetrics = {}) => {
+  const origin = publicOriginFor(request);
+  const safe = publicJob(job);
+  const order = job.orderId ? orders.get(job.orderId) : null;
+  return {
+    ...safe,
+    sheetUrl: job.status === "awaiting_client_processing" ? `/api/admin/jobs/${job.id}/sheet` : null,
+    shareUrl: job.pageUrl ? `${origin}${job.pageUrl.startsWith("/") ? "" : "/"}${job.pageUrl}` : null,
+    imageUrls: (safe.avatars || []).map((avatar) => `${origin}${avatar.src.startsWith("/") ? "" : "/"}${avatar.src}`),
+    generationError: job.internalError || job.error || null,
+    generationSeconds: job.completedAt ? Math.max(0, Math.round((Date.parse(job.completedAt) - Date.parse(job.createdAt)) / 1000)) : null,
+    order: order ? {
+      id: order.id,
+      status: order.status,
+      channel: order.channel,
+      provider: order.provider,
+      amountCny: order.amountCny,
+      createdAt: order.createdAt,
+      paidAt: order.paidAt,
+      consumedAt: order.consumedAt,
+    } : null,
+    analytics: analyticsMetrics,
+  };
+};
+
+const atomicWriteJson = async (filename, value) => {
+  const temporary = `${filename}.${crypto.randomBytes(5).toString("hex")}.tmp`;
+  await writeFile(temporary, JSON.stringify(value, null, 2), {encoding: "utf8", mode: 0o600});
+  await rename(temporary, filename);
+};
+
+const persistJob = async (job) => {
+  const directory = path.join(generatedRoot, job.id);
+  await mkdir(directory, {recursive: true});
+  await atomicWriteJson(path.join(directory, "job.json"), job);
+};
+
+const persistOrder = async (order) => {
+  await mkdir(ordersRoot, {recursive: true});
+  await atomicWriteJson(path.join(ordersRoot, `${order.id}.json`), order);
+};
+
+const updateJob = async (id, patch) => {
+  const current = jobs.get(id);
+  if (!current) return null;
+  const next = {...current, ...patch, updatedAt: new Date().toISOString()};
+  jobs.set(id, next);
+  await persistJob(next);
+  return next;
+};
+
+const updateOrder = async (id, patch) => {
+  const current = orders.get(id);
+  if (!current) return null;
+  const next = {...current, ...patch, updatedAt: new Date().toISOString()};
+  orders.set(id, next);
+  await persistOrder(next);
+  return next;
+};
+
+const drainWorkQueue = () => {
+  while (activeWork < maxConcurrentWork && workQueue.length > 0) {
+    const task = workQueue.shift();
+    activeWork += 1;
+    Promise.resolve()
+      .then(task)
+      .catch((error) => console.error("Work queue error:", error instanceof Error ? error.message : String(error)))
+      .finally(() => {
+        activeWork -= 1;
+        drainWorkQueue();
+      });
+  }
+};
+
+const enqueueWork = (task) => {
+  workQueue.push(task);
+  drainWorkQueue();
+};
+
+const restoreState = async () => {
+  await Promise.all([mkdir(generatedRoot, {recursive: true}), mkdir(ordersRoot, {recursive: true})]);
+  for (const entry of await readdir(generatedRoot, {withFileTypes: true})) {
+    if (!entry.isDirectory()) continue;
+    try {
+      const job = JSON.parse(await readFile(path.join(generatedRoot, entry.name, "job.json"), "utf8"));
+      if (job.title === "小太阳") job.title = "耙耙柑";
+      if (["queued", "generating", "rendering"].includes(job.status)) {
+        job.status = job.avatars?.length === 9 ? "ready" : "failed";
+        job.stage = job.avatars?.length === 9 ? "素材已保留，视频可在浏览器本机生成" : "任务在服务重启时中断";
+        job.error = job.avatars?.length === 9 ? null : "请返回首页重新发起生成";
+        job.updatedAt = new Date().toISOString();
+        await persistJob(job);
+      }
+      if (job.avatars?.length === 9 && job.permanent !== true) {
+        job.permanent = true;
+        job.expiresAt = null;
+      }
+      if (job.avatars?.length === 9) {
+        delete job.videoUrl;
+        delete job.renderError;
+        job.videoStatus = "local";
+        job.avatars = job.avatars.map((avatar, index) => ({
+          ...avatar,
+          src: `/generated/${job.id}/face-${String(index + 1).padStart(2, "0")}.png`,
+          label: `${job.title} 表情 ${index + 1}`,
+        }));
+        job.pageUrl = `/?view=${job.id}`;
+        await persistJob(job);
+      }
+      jobs.set(job.id, job);
+    } catch {
+      // Stale or incomplete folders are ignored and removed by cleanup.
+    }
+  }
+  for (const entry of await readdir(ordersRoot, {withFileTypes: true})) {
+    if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
+    try {
+      const order = JSON.parse(await readFile(path.join(ordersRoot, entry.name), "utf8"));
+      if (order.status === "pending" && Date.parse(order.expiresAt) < Date.now()) order.status = "expired";
+      orders.set(order.id, order);
+    } catch {
+      // Keep other valid orders available.
+    }
+  }
+};
+
+const ensureDemoJobs = async () => {
+  for (const profile of demoProfiles) {
+    const id = `demo-${profile.id}`;
+    const directory = path.join(generatedRoot, id);
+    const existing = jobs.get(id);
+    const demoAssetsVersion = 4;
+    await mkdir(directory, {recursive: true});
+    const facePaths = [];
+    for (let index = 0; index < profile.sources.length; index += 1) {
+      const target = path.join(directory, `face-${String(index + 1).padStart(2, "0")}.png`);
+      facePaths.push(target);
+      try {
+        if (existing?.demoAssetsVersion !== demoAssetsVersion) throw new Error("refresh demo assets");
+        await stat(target);
+      } catch {
+        await sharp(profile.sources[index])
+          .ensureAlpha()
+          .resize(1365, 1365, {
+            fit: "contain",
+            withoutEnlargement: true,
+            background: {r: 0, g: 0, b: 0, alpha: 0},
+          })
+          .png({compressionLevel: 9, adaptiveFiltering: true})
+          .toFile(target);
+      }
+    }
+    const themes = await Promise.all(facePaths.map(getImageTheme));
+    const createdAt = existing?.createdAt || new Date().toISOString();
+    const job = {
+      ...existing,
+      id,
+      title: profile.title,
+      demo: true,
+      demoId: profile.id,
+      demoAssetsVersion,
+      status: "ready",
+      stage: "示例互动页已准备好，视频可在浏览器本机生成",
+      progress: 100,
+      appearance: normalizeAppearance(existing?.appearance || defaultAppearance),
+      avatars: buildAvatarManifest(id, profile.title, "", themes),
+      pageUrl: `/?demo=${profile.id}`,
+      permanent: true,
+      expiresAt: null,
+      videoStatus: "local",
+      createdAt,
+      updatedAt: new Date().toISOString(),
+    };
+    delete job.videoUrl;
+    delete job.renderError;
+    jobs.set(id, job);
+    await persistJob(job);
+  }
+};
+
+const cleanupExpiredJobs = async () => {
+  const now = Date.now();
+  for (const entry of await readdir(generatedRoot, {withFileTypes: true})) {
+    if (!entry.isDirectory()) continue;
+    if (jobs.get(entry.name)?.permanent === true) continue;
+    const directory = path.join(generatedRoot, entry.name);
+    const details = await stat(directory);
+    if (now - details.mtimeMs <= retentionMs) continue;
+    await rm(directory, {recursive: true, force: true});
+    jobs.delete(entry.name);
+  }
+};
+
+const publicOriginFor = (request) => (
+  process.env.PUBLIC_ORIGIN || `${request.protocol}://${request.get("host")}`
+).replace(/\/$/, "");
+
+const accessTokenFrom = (request) => request.get("x-access-token") || request.query.token || "";
+
+const rateAllowed = (key, limit) => {
+  const now = Date.now();
+  const recent = (rateHits.get(key) || []).filter((time) => now - time < 60 * 60 * 1000);
+  if (recent.length >= limit) return false;
+  rateHits.set(key, [...recent, now]);
+  return true;
+};
+
+app.disable("x-powered-by");
+app.set("trust proxy", 1);
+app.use(express.urlencoded({extended: false, limit: "256kb"}));
+app.use(express.json({limit: "1mb"}));
+
+const requireAdmin = (request, response, next) => {
+  if (!adminAuth.configured) return response.status(503).json({error: "管理后台尚未配置 ADMIN_PASSWORD"});
+  if (!adminAuth.authenticated(request)) return response.status(401).json({error: "请先登录管理后台"});
+  next();
+};
+
+const analyticsDaysFrom = (request) => {
+  const value = Number(request.query.days ?? 7);
+  return [0, 1, 7, 30, 90].includes(value) ? value : 7;
+};
+
+app.post("/api/analytics/events", async (request, response) => {
+  const ip = request.ip || "unknown";
+  if (!rateAllowed(`analytics:${ip}`, 5000)) return response.status(429).json({error: "事件上报过于频繁"});
+  const accepted = await analytics.record(request.body, request);
+  response.status(202).json({ok: true, accepted});
+});
+
+app.get("/api/admin/session", (request, response) => {
+  response.setHeader("Cache-Control", "no-store");
+  response.json({configured: adminAuth.configured, authenticated: adminAuth.authenticated(request)});
+});
+
+app.post("/api/admin/session", (request, response) => {
+  if (!adminAuth.configured) return response.status(503).json({error: "请先在服务器配置 ADMIN_PASSWORD"});
+  const ip = request.ip || "unknown";
+  if (!rateAllowed(`admin-login:${ip}`, 12)) return response.status(429).json({error: "登录尝试过于频繁，请稍后再试"});
+  if (!adminAuth.validPassword(String(request.body.password || ""))) return response.status(401).json({error: "管理密码不正确"});
+  response.setHeader("Set-Cookie", adminAuth.createSessionCookie());
+  response.setHeader("Cache-Control", "no-store");
+  response.json({configured: true, authenticated: true});
+});
+
+app.delete("/api/admin/session", (_request, response) => {
+  response.setHeader("Set-Cookie", adminAuth.clearSessionCookie());
+  response.status(204).end();
+});
+
+app.get("/api/admin/dashboard", requireAdmin, async (request, response) => {
+  const days = analyticsDaysFrom(request);
+  const events = await analytics.list({days, limit: 250_000});
+  const analyticsSummary = summarizeEvents(events);
+  const includeDemos = request.query.includeDemos === "1";
+  const query = String(request.query.q || "").trim().toLowerCase().slice(0, 80);
+  const status = String(request.query.status || "all");
+  const page = Math.max(1, Number(request.query.page) || 1);
+  const pageSize = Math.max(12, Math.min(100, Number(request.query.pageSize) || 36));
+  const allJobs = [...jobs.values()].sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt));
+  const realJobs = allJobs.filter((job) => !job.demo);
+  const eligibleJobs = includeDemos ? allJobs : realJobs;
+  const filteredJobs = eligibleJobs.filter((job) => {
+    if (status !== "all" && job.status !== status) return false;
+    if (!query) return true;
+    return [job.id, job.orderId, job.title, job.model, job.status].some((value) => String(value || "").toLowerCase().includes(query));
+  });
+  const offset = (page - 1) * pageSize;
+  const pagedJobs = filteredJobs.slice(offset, offset + pageSize).map((job) => adminJob(job, request, analyticsSummary.perJob[job.id] || {}));
+  const chinaDateKey = (value) => new Date(Date.parse(value) + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const today = chinaDateKey(new Date().toISOString());
+  const totalEstimatedCostCny = realJobs.reduce((total, job) => total + Number(job.seedreamCostEstimate?.estimatedTotalCny || 0), 0);
+
+  response.setHeader("Cache-Control", "no-store");
+  response.json({
+    rangeDays: days,
+    overview: {
+      totalJobs: realJobs.length,
+      readyJobs: realJobs.filter((job) => job.status === "ready").length,
+      failedJobs: realJobs.filter((job) => job.status === "failed").length,
+      processingJobs: realJobs.filter((job) => !["ready", "failed"].includes(job.status)).length,
+      todayJobs: realJobs.filter((job) => job.createdAt && chinaDateKey(job.createdAt) === today).length,
+      permanentJobs: realJobs.filter((job) => job.permanent).length,
+      totalImages: realJobs.reduce((total, job) => total + (job.avatars?.length || 0), 0),
+      demoJobs: allJobs.filter((job) => job.demo).length,
+      totalEstimatedCostCny: Number(totalEstimatedCostCny.toFixed(2)),
+      visits: analyticsSummary.visits,
+      uniqueSessions: analyticsSummary.uniqueSessions,
+      interactions: analyticsSummary.interactions,
+      averageStaySeconds: analyticsSummary.averageStaySeconds,
+      visibleSeconds: analyticsSummary.visibleSeconds,
+    },
+    topActions: analyticsSummary.topActions,
+    daily: analyticsSummary.daily,
+    jobs: pagedJobs,
+    pagination: {
+      page,
+      pageSize,
+      total: filteredJobs.length,
+      pages: Math.max(1, Math.ceil(filteredJobs.length / pageSize)),
+    },
+    recentEvents: events.slice(0, 60).map(publicAdminEvent),
+  });
+});
+
+app.get("/api/admin/jobs/:id/events", requireAdmin, async (request, response) => {
+  const job = jobs.get(request.params.id);
+  if (!job) return response.status(404).json({error: "没有找到这个生成任务"});
+  const days = analyticsDaysFrom(request);
+  const limit = Math.max(20, Math.min(1000, Number(request.query.limit) || 200));
+  const events = await analytics.list({days, jobId: job.id, limit});
+  response.setHeader("Cache-Control", "no-store");
+  response.json({job: adminJob(job, request, summarizeEvents(events).perJob[job.id] || {}), summary: summarizeEvents(events), events: events.map(publicAdminEvent)});
+});
+
+app.get("/api/admin/jobs/:id/sheet", requireAdmin, async (request, response) => {
+  const job = jobs.get(request.params.id);
+  if (!job) return response.status(404).end();
+  const filename = path.join(generatedRoot, job.id, "sheet.jpg");
+  try {
+    await stat(filename);
+  } catch {
+    return response.status(404).end();
+  }
+  response.setHeader("Cache-Control", "private, no-store");
+  response.sendFile(filename);
+});
+
+app.get("/api/health", (_request, response) => {
+  const payment = getPaymentStatus();
+  response.setHeader("Cache-Control", "no-store");
+  response.json({
+    ok: true,
+    configured: Boolean(process.env.ARK_API_KEY) || process.env.GENERATOR_DEMO_MODE === "1",
+    demoMode: process.env.GENERATOR_DEMO_MODE === "1",
+    model: process.env.SEEDREAM_MODEL || "doubao-seedream-5-0-pro-260628",
+    priceCny: "0.60",
+    suggestedDonationCny: "0.60",
+    legacyPaidPriceCny: PAYMENT_AMOUNT_CNY,
+    payment,
+    donationMode: true,
+    freeGeneration: true,
+    hybridProcessing: false,
+    localMediaProcessing: true,
+    clientVideoRendering: true,
+    serverVideoRendering: false,
+  });
+});
+
+app.post("/api/orders/donation", async (request, response) => {
+  const ip = request.ip || "unknown";
+  if (!rateAllowed(`donation:${ip}`, maxOrdersPerHour)) return response.status(429).json({error: "生成请求过于频繁，请稍后再试"});
+
+  const id = `D${Date.now().toString(36)}${crypto.randomBytes(6).toString("hex")}`.slice(0, 32);
+  const accessToken = crypto.randomBytes(24).toString("base64url");
+  const now = new Date();
+  const title = String(request.body.title || "我的").replace(/[<>/\\]/g, "").trim().slice(0, 20) || "我的";
+  const order = {
+    id,
+    title,
+    channel: "donation",
+    provider: "voluntary_tip",
+    amountCny: "0.00",
+    status: "paid",
+    accessTokenHash: hashAccessToken(accessToken),
+    createdAt: now.toISOString(),
+    updatedAt: now.toISOString(),
+    paidAt: now.toISOString(),
+    expiresAt: new Date(now.getTime() + orderExpiryMs).toISOString(),
+  };
+  orders.set(id, order);
+  await persistOrder(order);
+  response.status(201).json({...publicOrder(order), accessToken});
+});
+
+app.post("/api/orders", async (request, response) => {
+  const payment = getPaymentStatus();
+  const channel = request.body.channel === "alipay" ? "alipay" : "wechat";
+  if (!payment.channels.includes(channel)) return response.status(503).json({error: "这个支付通道正在配置中"});
+  const ip = request.ip || "unknown";
+  if (!rateAllowed(`order:${ip}`, maxOrdersPerHour)) return response.status(429).json({error: "订单创建过于频繁，请稍后再试"});
+
+  const id = `F${Date.now().toString(36)}${crypto.randomBytes(6).toString("hex")}`.slice(0, 32);
+  const accessToken = crypto.randomBytes(24).toString("base64url");
+  const now = new Date();
+  const title = String(request.body.title || "我的").replace(/[<>/\\]/g, "").trim().slice(0, 20) || "我的";
+  const order = {
+    id,
+    title,
+    channel,
+    provider: payment.provider,
+    amountCny: PAYMENT_AMOUNT_CNY,
+    status: "pending",
+    accessTokenHash: hashAccessToken(accessToken),
+    createdAt: now.toISOString(),
+    updatedAt: now.toISOString(),
+    expiresAt: new Date(now.getTime() + orderExpiryMs).toISOString(),
+  };
+  orders.set(id, order);
+  await persistOrder(order);
+  try {
+    const paymentResult = await createPayment({order, channel, publicOrigin: publicOriginFor(request)});
+    const readyOrder = await updateOrder(id, paymentResult);
+    response.status(201).json({...publicOrder(readyOrder), accessToken});
+  } catch (error) {
+    await updateOrder(id, {status: "failed"});
+    response.status(502).json({error: error instanceof Error ? error.message : "支付订单创建失败"});
+  }
+});
+
+app.get("/api/orders/:id", async (request, response) => {
+  const order = orders.get(request.params.id);
+  if (!order || !verifyAccessToken(accessTokenFrom(request), order.accessTokenHash)) {
+    return response.status(404).json({error: "没有找到这个订单"});
+  }
+  if (order.status === "pending" && Date.parse(order.expiresAt) < Date.now()) await updateOrder(order.id, {status: "expired"});
+  response.setHeader("Cache-Control", "no-store");
+  response.json(publicOrder(orders.get(order.id)));
+});
+
+app.post("/api/orders/:id/mock-pay", async (request, response) => {
+  if (process.env.PAYMENT_PROVIDER !== "mock" || process.env.NODE_ENV === "production") return response.status(404).end();
+  const order = orders.get(request.params.id);
+  if (!order || !verifyAccessToken(accessTokenFrom(request), order.accessTokenHash)) return response.status(404).json({error: "没有找到这个订单"});
+  const paid = await updateOrder(order.id, {status: "paid", paidAt: new Date().toISOString(), providerTransactionId: `mock_${Date.now()}`});
+  response.json(publicOrder(paid));
+});
+
+app.post("/api/payments/xunhu/notify", async (request, response) => {
+  const order = orders.get(String(request.body.trade_order_id || ""));
+  if (!order) return response.status(404).type("text/plain").send("fail");
+  const verified = verifyXunhuCallback(order, request.body);
+  if (!verified.ok) return response.status(400).type("text/plain").send("fail");
+  if (order.status !== "paid") {
+    await updateOrder(order.id, {
+      status: "paid",
+      paidAt: new Date().toISOString(),
+      providerTransactionId: String(request.body.transaction_id || ""),
+      providerOrderId: String(request.body.open_order_id || order.providerOrderId || ""),
+    });
+  }
+  response.type("text/plain").send("success");
+});
+
+app.post("/api/jobs", photoUpload.single("photo"), async (request, response) => {
+  if (!request.file) return response.status(400).json({error: "请上传一张清晰的正脸照片"});
+  if (request.body.consent !== "true") return response.status(400).json({error: "请先确认您有权使用这张照片"});
+  const order = orders.get(String(request.body.orderId || ""));
+  const accessToken = String(request.body.accessToken || "");
+  if (!order || !verifyAccessToken(accessToken, order.accessTokenHash)) return response.status(403).json({error: "订单校验失败"});
+  if (order.status !== "paid") return response.status(402).json({error: "订单尚未支付"});
+  if (order.jobId) {
+    const existing = jobs.get(order.jobId);
+    if (existing) return response.status(200).json({...publicJob(existing), accessToken});
+  }
+
+  const id = crypto.randomUUID().replaceAll("-", "");
+  const now = Date.now();
+  const createdAt = new Date(now).toISOString();
+  const job = {
+    id,
+    orderId: order.id,
+    title: order.title,
+    status: "queued",
+    stage: "正在排队",
+    progress: 2,
+    appearance: defaultAppearance,
+    accessTokenHash: order.accessTokenHash,
+    payment: {
+      status: order.provider === "voluntary_tip" ? "donation_optional" : "paid",
+      amountCny: order.amountCny || PAYMENT_AMOUNT_CNY,
+      channel: order.channel,
+    },
+    renderCount: 0,
+    createdAt,
+    updatedAt: createdAt,
+    expiresAt: new Date(now + retentionMs).toISOString(),
+    model: process.env.SEEDREAM_MODEL || "doubao-seedream-5-0-pro-260628",
+  };
+  jobs.set(id, job);
+  await persistJob(job);
+  await updateOrder(order.id, {jobId: id, consumedAt: createdAt});
+  response.status(202).json({...publicJob(job), accessToken});
+
+  const publicOrigin = publicOriginFor(request);
+  enqueueWork(async () => {
+    try {
+      await runGenerationPipeline({
+        job,
+        sourceBuffer: request.file.buffer,
+        projectRoot,
+        generatedRoot,
+        publicOrigin,
+        update: (patch) => updateJob(id, patch),
+      });
+    } catch (error) {
+      await updateJob(id, {
+        status: "failed",
+        stage: "生成没有完成",
+        error: "生成失败，请稍后重试或更换一张清晰正脸照",
+        internalError: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+});
+
+app.get("/api/jobs/:id", (request, response) => {
+  const job = jobs.get(request.params.id);
+  if (!job) return response.status(404).json({error: "没有找到这个生成任务"});
+  response.setHeader("Cache-Control", "no-store");
+  response.json(publicJob(job));
+});
+
+app.get("/api/jobs/:id/sheet", (request, response) => {
+  const job = jobs.get(request.params.id);
+  if (!job || !verifyAccessToken(accessTokenFrom(request), job.accessTokenHash)) return response.status(404).end();
+  response.setHeader("Cache-Control", "private, no-store");
+  response.sendFile(path.join(generatedRoot, job.id, "sheet.jpg"));
+});
+
+app.post("/api/jobs/:id/faces", faceUpload.array("faces", 9), async (request, response) => {
+  const job = jobs.get(request.params.id);
+  if (!job || !verifyAccessToken(accessTokenFrom(request), job.accessTokenHash)) return response.status(404).json({error: "没有找到这个任务"});
+  if (job.avatars?.length === 9) return response.json(publicJob(job));
+  if (job.status !== "awaiting_client_processing") return response.status(409).json({error: "任务暂时不能接收抠图结果"});
+  if (request.files?.length !== 9) return response.status(400).json({error: "需要上传九张透明 PNG"});
+
+  const directory = path.join(generatedRoot, job.id);
+  try {
+    for (let index = 0; index < 9; index += 1) {
+      await sharp(request.files[index].buffer)
+        .ensureAlpha()
+        .resize(1365, 1365, {
+          fit: "contain",
+          withoutEnlargement: true,
+          background: {r: 0, g: 0, b: 0, alpha: 0},
+        })
+        .png({compressionLevel: 9, adaptiveFiltering: true})
+        .toFile(path.join(directory, `face-${String(index + 1).padStart(2, "0")}.png`));
+    }
+    const facePaths = Array.from({length: 9}, (_, index) => path.join(directory, `face-${String(index + 1).padStart(2, "0")}.png`));
+    const themes = await Promise.all(facePaths.map(getImageTheme));
+    const avatars = buildAvatarManifest(job.id, job.title, publicOriginFor(request), themes);
+    const next = await updateJob(job.id, {
+      status: "ready",
+      stage: "透明表情和互动页已完成，视频可在浏览器本机生成",
+      progress: 100,
+      avatars,
+      videoStatus: "local",
+      pageUrl: `/?view=${job.id}`,
+      permanent: true,
+      expiresAt: null,
+      completedAt: new Date().toISOString(),
+    });
+    await rm(path.join(directory, "sheet.jpg"), {force: true});
+    response.status(201).json(publicJob(next));
+  } catch (error) {
+    response.status(400).json({error: "抠图结果无法读取，请重新处理"});
+  }
+});
+
+app.post("/api/jobs/:id/renders", async (request, response) => {
+  const job = jobs.get(request.params.id);
+  if (!job || !verifyAccessToken(accessTokenFrom(request), job.accessTokenHash)) return response.status(404).json({error: "没有找到这个任务"});
+  if (!job.avatars?.length) return response.status(409).json({error: "九张表情还没有准备好"});
+  return response.status(410).json({error: "视频已改为浏览器本机生成，请刷新页面后点击保存视频"});
+});
+
+app.post("/api/public/jobs/:id/renders", async (request, response) => {
+  const job = jobs.get(request.params.id);
+  if (!job?.permanent || !job.avatars?.length) return response.status(404).json({error: "没有找到这个永久作品"});
+  return response.status(410).json({error: "视频已改为浏览器本机生成，请刷新页面后点击保存视频"});
+});
+
+app.get("/generated/:id/:filename", (request, response) => {
+  if (!jobs.has(request.params.id)) return response.status(404).end();
+  if (!/^(?:face-\d{2}\.png|video\.mp4)$/.test(request.params.filename)) return response.status(404).end();
+  response.setHeader("Cache-Control", request.params.filename === "video.mp4" ? "private, no-cache" : "private, max-age=3600");
+  const filename = path.join(generatedRoot, request.params.id, request.params.filename);
+  if (request.params.filename === "video.mp4" && request.query.download === "1") {
+    const title = String(jobs.get(request.params.id)?.title || "Tiny Moods").replace(/[<>/\\]/g, "").trim() || "Tiny Moods";
+    return response.download(filename, `${title}-Tiny-Moods.mp4`);
+  }
+  response.sendFile(filename);
+});
+
+if (process.env.NODE_ENV === "production") {
+  const distRoot = path.join(projectRoot, "dist");
+  app.use(express.static(distRoot, {index: false}));
+  app.get(/^(?!\/api\/|\/generated\/).*/, (_request, response) => response.sendFile(path.join(distRoot, "index.html")));
+} else {
+  const {createServer} = await import("vite");
+  const vite = await createServer({root: projectRoot, server: {middlewareMode: true}, appType: "spa"});
+  app.use(vite.middlewares);
+}
+
+app.use((error, _request, response, _next) => {
+  const isUploadError = error instanceof multer.MulterError || error?.message?.startsWith("仅支持") || error?.message?.startsWith("本地抠图");
+  response.status(isUploadError ? 400 : 500).json({error: isUploadError ? error.message : "服务暂时不可用"});
+});
+
+await restoreState();
+await ensureDemoJobs();
+await analytics.init();
+await cleanupExpiredJobs();
+setInterval(() => void cleanupExpiredJobs(), 60 * 60 * 1000).unref();
+
+app.listen(port, "0.0.0.0", () => {
+  console.log(`Tiny Moods generator: http://127.0.0.1:${port}/`);
+});
