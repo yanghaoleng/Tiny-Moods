@@ -207,6 +207,7 @@ function JobFaces({job, large = false}) {
 
 function JobCard({job, onOpen}) {
   const metrics = job.analytics || {};
+  const linkLabel = job.status === "ready" ? "打开永久链接" : "打开固定任务链接";
   return (
     <article className="admin-job-card">
       <button type="button" className="admin-job-open" onClick={() => onOpen(job)} aria-label={`查看 ${job.title} 的生成详情`}>
@@ -227,7 +228,7 @@ function JobCard({job, onOpen}) {
       </button>
       <div className="admin-job-footer">
         <code>{job.id}</code>
-        {job.shareUrl ? <a href={job.shareUrl} target="_blank" rel="noreferrer">打开永久链接 <ArrowSquareOut weight="bold" /></a> : <span>尚无永久链接</span>}
+        <a href={job.adminOpenUrl || job.fixedUrl} target="_blank" rel="noreferrer">{linkLabel} <ArrowSquareOut weight="bold" /></a>
       </div>
     </article>
   );
@@ -267,15 +268,16 @@ function JobDetail({job, detail, loading, onClose}) {
     };
   }, [onClose]);
 
+  const current = detail?.job || job;
   const copyLink = async () => {
-    if (!job.shareUrl) return;
-    await navigator.clipboard.writeText(job.shareUrl);
+    if (!current.fixedUrl) return;
+    await navigator.clipboard.writeText(current.fixedUrl);
     setCopyState("已复制");
     window.setTimeout(() => setCopyState(""), 1600);
   };
 
-  const current = detail?.job || job;
   const metrics = current.analytics || {};
+  const linkLabel = current.status === "ready" ? "打开永久链接" : "打开固定任务链接";
   return (
     <div className="admin-detail-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <aside className="admin-detail" role="dialog" aria-modal="true" aria-labelledby="admin-detail-title">
@@ -289,8 +291,8 @@ function JobDetail({job, detail, loading, onClose}) {
         <div className="admin-detail-scroll">
           <JobFaces job={current} large />
           <div className="admin-detail-actions">
-            {current.shareUrl ? <a href={current.shareUrl} target="_blank" rel="noreferrer">打开永久链接 <ArrowSquareOut weight="bold" /></a> : null}
-            {current.shareUrl ? <button type="button" onClick={copyLink}><CopySimple weight="bold" />{copyState || "复制链接"}</button> : null}
+            <a href={current.adminOpenUrl || current.fixedUrl} target="_blank" rel="noreferrer">{linkLabel} <ArrowSquareOut weight="bold" /></a>
+            <button type="button" onClick={copyLink}><CopySimple weight="bold" />{copyState || "复制固定链接"}</button>
           </div>
 
           <section className="admin-detail-section">

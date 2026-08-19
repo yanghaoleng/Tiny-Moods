@@ -113,10 +113,14 @@ const demoProfiles = [
 ];
 const patternStyles = new Set(["auto", "dots", "checks", "petals", "confetti", "none"]);
 const VISITOR_COOKIE = "tiny_moods_visitor";
-const visitorCookieValue = (request) => {
+const RESUME_COOKIE = "tiny_moods_resume";
+const cookieValue = (request, name) => {
   const header = request.get("cookie") || "";
-  const item = header.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${VISITOR_COOKIE}=`));
-  const value = item ? decodeURIComponent(item.slice(VISITOR_COOKIE.length + 1)) : "";
+  const item = header.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${name}=`));
+  return item ? decodeURIComponent(item.slice(name.length + 1)) : "";
+};
+const visitorCookieValue = (request) => {
+  const value = cookieValue(request, VISITOR_COOKIE);
   return /^[a-zA-Z0-9_-]{24,80}$/.test(value) ? value : "";
 };
 const ensureVisitor = (request, response) => {
@@ -203,10 +207,15 @@ const adminJob = (job, request, analyticsMetrics = {}) => {
   const origin = publicOriginFor(request);
   const safe = publicJob(job);
   const order = job.orderId ? orders.get(job.orderId) : null;
+  const fixedPath = job.status === "ready" && job.pageUrl ? job.pageUrl : `/?job=${job.id}`;
   return {
     ...safe,
     sheetUrl: job.status === "awaiting_client_processing" ? `/api/admin/jobs/${job.id}/sheet` : null,
     shareUrl: job.pageUrl ? `${origin}${job.pageUrl.startsWith("/") ? "" : "/"}${job.pageUrl}` : null,
+    fixedUrl: `${origin}${fixedPath}`,
+    adminOpenUrl: job.status === "ready" && job.pageUrl
+      ? `${origin}${job.pageUrl}`
+      : `${origin}/api/admin/jobs/${job.id}/resume`,
     imageUrls: (safe.avatars || []).map((avatar) => `${origin}${avatar.src.startsWith("/") ? "" : "/"}${avatar.src}`),
     generationError: job.internalError || job.error || null,
     generationSeconds: job.completedAt ? Math.max(0, Math.round((Date.parse(job.completedAt) - Date.parse(job.createdAt)) / 1000)) : null,
@@ -422,6 +431,7 @@ const canProcessJob = (request, job) => (
   ownsJob(request, job)
   || verifyAccessToken(accessTokenFrom(request), job.accessTokenHash)
   || verifySearchResumeToken(accessTokenFrom(request), job)
+  || verifySearchResumeToken(cookieValue(request, RESUME_COOKIE), job)
 );
 
 const rateAllowed = (key, limit) => {
@@ -553,6 +563,19 @@ app.get("/api/admin/jobs/:id/sheet", requireAdmin, async (request, response) => 
   response.sendFile(filename);
 });
 
+app.get("/api/admin/jobs/:id/resume", requireAdmin, (request, response) => {
+  const job = jobs.get(request.params.id);
+  if (!job || job.demo) return response.status(404).json({error: "没有找到这个作品"});
+  response.cookie(RESUME_COOKIE, searchResumeTokenFor(job), {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 24 * 60 * 60 * 1000,
+    path: "/",
+  });
+  response.redirect(303, `/?job=${encodeURIComponent(job.id)}`);
+});
+
 app.get("/api/health", (_request, response) => {
   const payment = getPaymentStatus();
   const defaultModel = resolveImageModel(defaultImageModelKey());
@@ -596,7 +619,6 @@ app.get("/api/works/search", (request, response) => {
   const items = [...jobs.values()]
     .filter((job) => !job.demo && ["ready", "awaiting_client_processing"].includes(job.status) && String(job.title || "").normalize("NFKC").trim().toLocaleLowerCase("zh-CN") === normalizedName)
     .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))
-    .slice(0, 20)
     .map((job) => ({
       ...historyJob(job),
       ...(job.status === "awaiting_client_processing" ? {resumeToken: searchResumeTokenFor(job)} : {}),
