@@ -18,7 +18,7 @@
 | 拖入框 / 上传栏 | 收短后的单图拖拽上传区，首页不使用上下分割线 | `.photo-dropzone` / `.photo-workbench` / `.landing-theme .generator-nav` / `.example-section` |
 | 对象名字 / 谁的名字 | 选图后展开的名称输入，说明位于输入框上方 | `subjectName` / `.subject-name-field` / `.subject-name-copy` |
 | 右上角生成记录 / 我的作品 | 当前浏览器通过匿名 Cookie 关联的任务记录入口 | `WorkHistoryDialog` / `.history-trigger` / `/api/history` / `tiny_moods_visitor` |
-| 左下角作者主页 / 作者链接 | 页面底部左侧通往 Mikey 个人主页、使用 NCM 同款页边距的小字外链 | `.landing-footer` / `author_home_open` / `https://mikeywa.icu` |
+| 左下角作者主页 / 作者链接 | 页面底部左侧通往 Mikey 国内主页、使用 NCM 同款页边距的小字外链 | `.landing-footer` / `author_home_open` / `https://mikeywa.site` |
 | 正在生成的记录 / 等待本地完成 | 可从固定任务页继续轮询、拆图和抠图的未完成作品 | `?job=:id` / `resumeUrl` / `owned` / `useLocalMatting` |
 | 按名字找作品 / 搜作品 | 使用生成时完整名字精确查询已完成或等待前端处理的作品；待处理结果可恢复生成 | `.work-search-form` / `/api/works/search?name=` / `resumeToken` / `searchResumeTokenFor` |
 | 确认生成和移除按钮 / 上传后操作栏 | 与名字输入框同排、同高、底边对齐的操作组 | `.photo-details` / `.photo-detail-actions` / `.generate-button` / `.remove-photo` |
@@ -26,9 +26,10 @@
 | 案例浮窗 | 桌面 3:4 预览浮窗、手机底部半弹窗 | `ExamplePreviewDialog` / `embedded` |
 | 日系相册 / C 方案 | 首页固定的明亮轻日系视觉 | `.landing-theme` |
 | 打赏弹窗 | 免费生成前说明层 | `DonationDialog` |
+| 微信赞赏码 / 长按打赏图 | 微信原生个人赞赏码，不接 API 且不校验支付 | `public/donate/wechat-appreciation-code.jpg` / `.donation-qr-frame` / `DonationDialog` |
 | 选模型 / Pro 和 Lite / 默认 Lite | 打赏层中的双段 Switch；默认 Lite，提交所选 `model` 键 | `fallbackDonationModels` / `.donation-model-switch` / `selectedModelKey` / `image-models.mjs` |
 | ¥1 ~ ¥3 / 打赏金额 | 无“建议打赏”前缀的固定自愿支持区间 | `.donation-amount` / `suggestedDonationCny` |
-| 价格下面的小字 / 感谢文案 | 建议打赏金额下方的支持感谢语 | `.donation-support-copy` / `Calligraph` |
+| 价格下面的小字 / 感谢文案 | 建议打赏金额下方的两行支持感谢语，逐字 Typer 入场 | `.donation-support-copy` / `TyperSupportCopy` |
 | ¥1 ~ ¥3 | 固定的自愿打赏建议区间 | `.donation-amount` |
 | 复制作者微信 | 问题与建议联系入口 | `.donation-contact-copy` / `copyText("yanghaoleng")` |
 | 我已打赏，用某模型生成 | 带当前模型的生成入口 | `.donation-continue` / `continueAfterDonation` |
@@ -64,7 +65,7 @@
 | 人物白边 | Alpha 通道描边 | `.portrait` 的 `drop-shadow` |
 | 波纹 | 半调点阵高亮扩散 | `HalftoneRippleBackground` |
 | 自动慢慢换一个 / Hover 不打断 | 独立于悬停状态的自动换装计时器 | `AUTO_CHANGE_INTERVAL` / `changeLook`；头像按钮无 `whileHover` |
-| 立即播放音乐 / 首次点击补播 | BGM 自动播放与浏览器策略回退 | `autoPlay` / `preload="auto"` / `tryStartAudio` |
+| 立即播放音乐 / 首次点击补播 / 微信里开一下又关 | BGM 自动播放、微信桥接兼容与浏览器策略回退 | `autoPlay` / `preload="auto"` / `tryStartAudio` / `WeixinJSBridgeReady` / `playing` |
 | 互动 WebP / 抠图后图片 | 九张 1080px 透明 WebP，只用于网页互动、二维码和视频 | `avatar.src` / `writeFaceWebp` / `/generated/:id/face-XX.webp` |
 | 全部图片压缩 | 静态 PNG 批量转 WebP | `npm run images:optimize` / `scripts/optimize-static-images.mjs` |
 | 图片长缓存 / 打开更快 | 指纹静态资源和作品 WebP 的一年不可变缓存 | `/assets` / `express.static(..., {maxAge: "1y", immutable: true})` / `/generated/:id/face-XX.webp` |

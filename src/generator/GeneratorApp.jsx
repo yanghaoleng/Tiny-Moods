@@ -1,6 +1,5 @@
 import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from "react";
 import {AnimatePresence, motion, useReducedMotion} from "motion/react";
-import {Calligraph} from "calligraph";
 import {ArrowRight} from "@phosphor-icons/react/ArrowRight";
 import {ArrowSquareOut} from "@phosphor-icons/react/ArrowSquareOut";
 import {Check} from "@phosphor-icons/react/Check";
@@ -1207,11 +1206,71 @@ function ExamplePreviewDialog({profile, onClose, onRender}) {
   );
 }
 
+function TyperSupportCopy({text, reduceMotion}) {
+  const copyRef = useRef(null);
+  const lines = text.split("\n");
+
+  useLayoutEffect(() => {
+    const copy = copyRef.current;
+    if (!copy) return undefined;
+    const characters = [...copy.querySelectorAll(".typer-char")];
+    const timers = [];
+    const baseClass = "typer-char donation-support-char";
+    const settle = () => {
+      characters.forEach((character) => { character.className = baseClass; });
+      copy.dataset.typerType = "done";
+    };
+
+    if (reduceMotion) {
+      settle();
+      return undefined;
+    }
+
+    copy.dataset.typerType = "in";
+    characters.forEach((character) => { character.className = `${baseClass} is-init`; });
+    const sequences = [];
+    characters.forEach((character, index) => {
+      const previous = sequences[index - 1];
+      const sequence = Array.from({length: 3}, (_, cycleIndex) => {
+        if (previous && Math.random() < 0.34) return previous[cycleIndex];
+        return typerVariations[Math.floor(Math.random() * typerVariations.length)];
+      });
+      sequences.push(sequence);
+      const delay = index * 42;
+      sequence.forEach((variation, cycleIndex) => {
+        timers.push(window.setTimeout(() => {
+          character.className = `${baseClass} ${variation}`;
+        }, delay + cycleIndex * 72));
+      });
+      timers.push(window.setTimeout(() => {
+        character.className = baseClass;
+        if (index === characters.length - 1) copy.dataset.typerType = "done";
+      }, delay + sequence.length * 72 + 58));
+    });
+
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [text, reduceMotion]);
+
+  return (
+    <span ref={copyRef} className="donation-support-typer" aria-label={text}>
+      {lines.map((line, lineIndex) => (
+        <span className="donation-support-line" aria-hidden="true" key={`${lineIndex}-${line}`}>
+          {[...line].map((character, characterIndex) => (
+            <span className="typer-char donation-support-char" key={`${lineIndex}-${characterIndex}-${character}`}>
+              {character}
+            </span>
+          ))}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 function DonationDialog({busy, error, models = fallbackDonationModels, onClose, onContinue}) {
   const reduceMotion = useReducedMotion();
   const [method, setMethod] = useState("wechat");
   const [wechatCopied, setWechatCopied] = useState(false);
-  const [supportCopy] = useState(() => `生成图片会产生费用，不需要给太多。${donationThanksCopies[Math.floor(Math.random() * donationThanksCopies.length)]}`);
+  const [supportCopy] = useState(() => `生成图片会产生费用，不需要给太多。\n${donationThanksCopies[Math.floor(Math.random() * donationThanksCopies.length)]}`);
   const switchModels = ["lite", "pro"].map((key) => models.find((model) => model.key === key)).filter(Boolean);
   const [selectedModelKey, setSelectedModelKey] = useState(() => (
     models.some((model) => model.key === "lite") ? "lite" : models[0]?.key || "lite"
@@ -1255,14 +1314,17 @@ function DonationDialog({busy, error, models = fallbackDonationModels, onClose, 
           <strong>¥1 ~ ¥3</strong>
         </div>
         <p className="donation-copy donation-support-copy">
-          {reduceMotion ? supportCopy : <Calligraph initial animation="smooth" drift={{x: 0, y: 10}} trend={1} stagger={0.012}>{supportCopy}</Calligraph>}
+          <TyperSupportCopy text={supportCopy} reduceMotion={reduceMotion} />
         </p>
         <div className="donation-tabs" role="tablist" aria-label="选择打赏方式">
           <button type="button" role="tab" aria-selected={method === "wechat"} className={method === "wechat" ? "is-selected wechat" : "wechat"} onClick={() => setMethod("wechat")} data-uisfx="select" data-analytics-action="donation_method" data-analytics-target="wechat"><WechatLogo weight="fill" />微信</button>
           <button type="button" role="tab" aria-selected={method === "alipay"} className={method === "alipay" ? "is-selected alipay" : "alipay"} onClick={() => setMethod("alipay")} data-uisfx="select" data-analytics-action="donation_method" data-analytics-target="alipay"><span aria-hidden="true">支</span>支付宝</button>
         </div>
         <div className="donation-qr-frame" role="tabpanel">
-          <img src={`${import.meta.env.BASE_URL}donate/${method}-qr.webp`} alt={`${method === "wechat" ? "微信" : "支付宝"}打赏二维码`} />
+          <img
+            src={`${import.meta.env.BASE_URL}donate/${method === "wechat" ? "wechat-appreciation-code.jpg" : "alipay-qr.webp"}`}
+            alt={method === "wechat" ? "微信赞赏码" : "支付宝打赏二维码"}
+          />
         </div>
         <p className="donation-contact-copy">有问题或建议请联系作者：<button type="button" onClick={async () => { await copyText("yanghaoleng"); setWechatCopied(true); }} data-uisfx="copy" data-analytics-action="author_wechat_copy">{wechatCopied ? "已复制 yanghaoleng" : "复制微信号（yanghaoleng）"}</button></p>
         {error ? <p className="donation-error">{error}</p> : null}
@@ -1666,7 +1728,7 @@ function Landing({resumeOrderId, onRenderExample, onJobCreated, onOpenWork}) {
       </motion.section>
 
       <footer className="landing-footer">
-        <a href="https://mikeywa.icu" target="_blank" rel="noreferrer" aria-label="打开作者主页" data-uisfx="open" data-analytics-action="author_home_open">
+        <a href="https://mikeywa.site" target="_blank" rel="noreferrer" aria-label="打开作者主页" data-uisfx="open" data-analytics-action="author_home_open">
           <span>作者主页</span>
           <ArrowSquareOut weight="bold" aria-hidden="true" />
         </a>

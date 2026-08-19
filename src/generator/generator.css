@@ -2080,16 +2080,33 @@
 .donation-amount strong { color: #1d1b1e; font-size: 1.2rem; letter-spacing: -0.035em; }
 
 .donation-support-copy {
+  --typer-fg: #1d1b1e;
+  --typer-bg: #fbfbfa;
+  --typer-accent: #c74362;
+  --typer-accent-ink: #fbfbfa;
+  --typer-radius: 4px;
   max-width: 348px;
   margin: 5px auto 15px;
   color: #4f4a4e;
-  font-size: 0.88rem;
+  font-size: clamp(0.98rem, 2.7vw, 1.04rem);
   font-weight: 750;
   line-height: 1.55;
   text-wrap: balance;
 }
 
-.donation-support-copy > span { justify-content: center; }
+.donation-support-typer {
+  display: grid;
+  justify-items: center;
+  width: 100%;
+}
+
+.donation-support-line {
+  display: inline-flex;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.donation-support-char.is-border::after { border-width: 1px; }
 
 .donation-contact-copy {
   margin: 10px auto 13px;
