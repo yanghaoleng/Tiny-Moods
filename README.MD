@@ -22,6 +22,7 @@
 - 首页使用上下布局，支持单图拖拽/点击上传、对象命名和四个动态案例
 - App Icon 旁使用英文产品名 `Tiny Moods`；统一加粗字号，`Tiny` 固定黑底，`Moods` 五个字母独立随机换色
 - `Tiny Moods` 左侧保留 9 个正放扁平透明相机图标；每次进入随机出现一个，点击品牌区域随机切换到另一个且不连续重复
+- 浏览器 Favicon 复用同一套 9 种相机配色，每次打开随机换一种并尽量避免与上次重复；静态回退图标为 SVG
 - 全站按钮使用 UI SFX `10 Cinematic` 语义音效；首次操作后启用，支持持久静音，不额外请求音频文件
 - 桌面端使用放大的黑色鼠标箭头，移动时留下中文或英文单语情绪词彩色标签轨迹；触摸设备和低动态偏好显示静态示例
 
@@ -53,7 +54,7 @@
 - 模型：火山方舟 `doubao-seedream-5-0-pro-260628`
 - 视频：1080×1920 布局按 `2/3` 缩放输出为 720×1280、30fps、约 21.27 秒、9 个造型；优先 H.264/AAC MP4
 - 数据：生产 `DATA_ROOT=/var/lib/9face`；作品资源使用同源相对地址，埋点按北京时间写入 `analytics/events/YYYY-MM-DD.jsonl`
-- 图片：静态运行素材统一为 WebP，只有约 14KB 的浏览器图标保留 PNG；作品浏览使用 960px WebP，保存和下载使用透明 PNG 原图
+- 图片：静态位图统一为 WebP，Favicon 为 SVG；带版本指纹的 `/assets` 使用一年强缓存；作品浏览使用 960px WebP，保存和下载使用透明 PNG 原图
 - 后台安全：不设置账户名，仅使用服务端 `ADMIN_PASSWORD`；登录后使用 12 小时 HttpOnly、SameSite 会话 Cookie，不把管理密码写入前端
 - 兼容：本机视频生成要求支持 WebCodecs 的新版 Chrome、Firefox 或 Safari
 
@@ -95,7 +96,7 @@ npm run build
 npm start
 ```
 
-压缩新增的静态 PNG 素材并转换为 WebP（浏览器图标除外）：
+压缩新增的静态 PNG 素材并转换为 WebP（SVG Favicon 不参与位图转换）：
 
 ```bash
 npm run images:optimize
@@ -125,8 +126,8 @@ node scripts/sync-home-examples.mjs
 - 正式入口：Nginx `https://tinymoods.mikeywa.site`
 - 旧入口：`https://9face.mikeywa.site` 保留为带路径和参数的 `301` 跳转
 - HTTPS：Let's Encrypt 自动续期，当前证书有效至 `2026-11-17`
-- 当前发布：`/opt/9face/releases/20260819143744`
-- 回滚点：`/opt/9face/releases/20260819100933`
+- 当前发布：`/opt/9face/releases/20260819161437`
+- 回滚点：`/opt/9face/releases/20260819161131`
 - 运营后台与埋点已发布；`ARK_API_KEY`、管理密码、会话密钥和埋点盐值只保存在服务器环境文件，不进入仓库
 
 ## 成本

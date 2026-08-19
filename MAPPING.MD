@@ -7,6 +7,7 @@
 | 黑色鼠标 / 放大指针 | 桌面端 37px 自定义实心指针，按下位移 2px | `EmotionCursorTrail` / `.emotion-cursor` |
 | Tiny Moods Logo / 九格拍立得 Logo | 品牌按钮和相机图标 | `BrandButton` / `app-icon.webp` |
 | 随机相机图标 / 点一下换相机 | 导航左侧保留的 9 个扁平透明相机；进入随机，点击品牌切换且不连续重复 | `CameraIcon` / `cameraIconConcepts` / `createCameraIconVariant` / `createInitialCameraIconVariant` / `tiny-moods:camera-icon` / `.camera-icon-*` |
+| 网页小图标 / 每次打开不一样 | 从 9 套 App 相机色板中随机选择的 SVG Favicon，避免与上次重复 | `installRandomFavicon` / `tiny-moods:favicon-variant` / `public/favicon.svg` / `data-favicon-variant` |
 | 图标生成参考稿 | 9 个图像生成方向的原始探索图，不直接用于页面透明图标 | `output/icon-concepts/flat-camera-generated/` |
 | App Icon 旁边的文字 / 网页标题 | 英文动态品牌字标 `Tiny Moods` | `BrandButton` / `.brand-glyph-bar` / `.brand-glyph` |
 | Tiny 黑色 / Moods 彩色 | 固定词与随机配色词 | `brandFixedLetters` / `brandMoodLetters` / `createMoodPalette` |
@@ -58,6 +59,7 @@
 | 立即播放音乐 / 首次点击补播 | BGM 自动播放与浏览器策略回退 | `autoPlay` / `preload="auto"` / `tryStartAudio` |
 | WebP 预览 / PNG 原图 | 互动浏览走压缩图，保存走透明原图 | `avatar.src` / `avatar.downloadSrc` / `writeFacePreview` |
 | 全部图片压缩 | 静态 PNG 批量转 WebP | `npm run images:optimize` / `scripts/optimize-static-images.mjs` |
+| 图片长缓存 / 打开更快 | 指纹静态资源和作品 WebP 的一年不可变缓存 | `/assets` / `express.static(..., {maxAge: "1y", immutable: true})` / `/generated/:id/face-XX.webp` |
 | 按钮音效 / 电影感音效 | UI SFX `10 Cinematic` 语义音效层 | `uiSfx` / `playUISfx` / `data-uisfx` |
 | 声音开关 / 静音按钮 | 全站界面音效开关 | `UISoundToggle` / `.ui-sfx-toggle` / `9face:ui-sfx` |
 | 大黑鼠标 / 情绪词轨迹 | 桌面自定义指针与无重叠彩色情绪标签拖尾 | `EmotionCursorTrail` / `.emotion-cursor` / `.emotion-trail-badge` |
