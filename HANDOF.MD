@@ -12,7 +12,7 @@
 
 本轮继续校准左上角品牌：相机图标单独上移 `10px`，与 `Tiny Moods` 字标保持光学横向对齐。
 
-本地待发布改动：左上角品牌光学对齐修正待发布；移动端、打赏弹层与 WebP/JPG/ZIP 链路已上线。
+本地待发布改动：无；左上角品牌光学对齐、移动端、打赏弹层与 WebP/JPG/ZIP 链路均已上线。
 
 本次交互精简已随正式版本上线：二维码小窗去掉指向箭头；九图批量保存复用已读取字节并零压缩打包，按钮位于九图列表底部；互动页删除底部重复静音按钮和右下角 `made for` 角标；生成中页面删除底部图标说明。
 
@@ -107,6 +107,7 @@
 - [x] 本地 DEMO 端到端验证：非法模型返回 `400`；Lite 订单、任务、生成阶段与后台均保持 `lite / ¥0.22 / 2144x2144`；Pro 订单为 `pro / ¥0.60`
 - [x] 默认、Lite、Pro 三种下单路径复核通过：默认与 Lite 均使用 `doubao-seedream-5-0-260128`，Pro 使用 `doubao-seedream-5-0-pro-260628`
 - [x] 线上 `/api/health` 返回 `defaultImageModel=lite`；首页 JS/CSS 与本地构建 SHA-256 一致，左上角品牌规则含 `translateY(10px)`
+- [x] 品牌图标上移后完成 `1280×800` 与 `390×844` 实截图验收；线上指纹 CSS 含 `.generator-brand-mark{transform:translateY(-10px)}`
 - [x] 本轮 `npm run build` 通过，638 个模块完成构建；`node --check server/index.mjs` 与 `git diff --check` 通过
 - [x] 本地接口串联验证：同一 Cookie 可读取刚创建的进行中任务，历史项返回固定 `?job=:id`，重新读取任务返回 `owned=true`
 - [x] `20260819172241` 公网首页与本地 `index / JS` SHA-256 一致；线上 JS 包含 5 色背景、显示设置接口、生成记录、作者主页和二维码错误诊断
@@ -114,8 +115,8 @@
 
 ## 发布状态
 
-- 本轮代码提交为 `7815eb5`，位于本地分支 `codex/webp-jpg-mobile-release`，尚未推送；GitHub 推送由杨总手动完成
-- 当前线上发布 `20260819181829`，直接回滚点 `20260819180714`；部署前完整数据备份位于 `/opt/9face/backups/data-before-20260819181829.tar.gz`
+- 本轮合并提交为 `ff4679a`，已推送至 GitHub `main`；其中保留 `7815eb5` 移动端与图片链路优化，并合入 `fb23fb3` 品牌图标对齐
+- 当前线上发布 `20260819182437`，直接回滚点 `20260819181829`；部署前完整数据备份位于 `/opt/9face/backups/data-before-20260819181829.tar.gz`
 - `9face.service` 为 `active`，`/api/health` 返回 `ok=true`，公网首页与 `/admin` 均返回 `200`
 - API Key、管理密码、会话密钥、埋点盐和运行数据仅保存在服务器环境文件或数据目录，敏感信息扫描已通过，未进入公开仓库
 

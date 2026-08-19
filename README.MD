@@ -153,10 +153,10 @@ node scripts/sync-home-examples.mjs
 - 正式入口：Nginx `https://tinymoods.mikeywa.site`
 - 旧入口：`https://9face.mikeywa.site` 保留为带路径和参数的 `301` 跳转
 - HTTPS：Let's Encrypt 自动续期，当前证书有效至 `2026-11-17`
-- 当前发布：`/opt/9face/releases/20260819181829`
-- 回滚点：`/opt/9face/releases/20260819180714`
+- 当前发布：`/opt/9face/releases/20260819182437`
+- 回滚点：`/opt/9face/releases/20260819181829`
 - 运营后台与埋点已发布；`ARK_API_KEY`、管理密码、会话密钥和埋点盐值只保存在服务器环境文件，不进入仓库
-- 后续每个完成任务默认执行本地提交和正式部署；GitHub 推送由杨总手动完成
+- 后续每个完成任务默认执行本地提交、推送和正式部署
 
 ## 成本
 
