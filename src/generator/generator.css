@@ -2267,14 +2267,6 @@
 
 .share-save-all:disabled { opacity: 0.5; cursor: wait; }
 
-.share-save-all-note {
-  margin: 7px 0 0;
-  color: #777175;
-  font-size: 0.67rem;
-  font-weight: 700;
-  text-align: center;
-}
-
 .share-face-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2546,9 +2538,7 @@
 }
 
 .share-video-section {
-  margin-top: 22px;
-  padding-top: 18px;
-  border-top: 1px solid rgb(29 27 30 / 0.14);
+  margin-top: 10px;
 }
 
 .share-video-section .share-save-video {
@@ -2556,20 +2546,12 @@
   min-height: 46px;
   margin: 0;
   padding: 10px 14px;
-  border: 1px solid #1d1b1e;
+  border: 1px solid rgb(29 27 30 / 0.28);
   border-radius: 12px;
-  color: #f9f8f8;
-  background: #1d1b1e;
+  color: #1d1b1e;
+  background: transparent;
   font-size: 0.8rem;
   font-weight: 900;
-}
-
-.share-video-section > p {
-  margin: 7px 0 0;
-  color: #777175;
-  font-size: 0.67rem;
-  font-weight: 700;
-  text-align: center;
 }
 
 .qr-bubble-layer {
@@ -2740,12 +2722,12 @@
 @media (prefers-reduced-motion: reduce) {
   .work-history-loading span { animation: none; }
 }
-+
 
 .landing-footer {
-  width: min(1180px, calc(100% - 40px));
+  box-sizing: border-box;
+  width: min(1240px, 100%);
   margin: 0 auto;
-  padding: 0 0 24px;
+  padding: 18px clamp(16px, 3vw, 36px) 22px;
 }
 
 .landing-footer a {
@@ -2775,11 +2757,4 @@
   outline: 3px solid color-mix(in srgb, var(--landing-accent) 72%, transparent);
   outline-offset: 4px;
   border-radius: 3px;
-}
-
-@media (max-width: 767px) {
-  .landing-footer {
-    width: calc(100% - 32px);
-    padding-bottom: max(20px, env(safe-area-inset-bottom));
-  }
 }

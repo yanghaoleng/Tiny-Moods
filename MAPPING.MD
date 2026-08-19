@@ -18,7 +18,7 @@
 | 拖入框 / 上传栏 | 收短后的单图拖拽上传区，首页不使用上下分割线 | `.photo-dropzone` / `.photo-workbench` / `.landing-theme .generator-nav` / `.example-section` |
 | 对象名字 / 谁的名字 | 选图后展开的名称输入，说明位于输入框上方 | `subjectName` / `.subject-name-field` / `.subject-name-copy` |
 | 右上角生成记录 / 我的作品 | 当前浏览器通过匿名 Cookie 关联的任务记录入口 | `WorkHistoryDialog` / `.history-trigger` / `/api/history` / `tiny_moods_visitor` |
-| 左下角作者主页 / 作者链接 | 页面底部左侧通往 Mikey 个人主页的小字外链 | `.landing-footer` / `author_home_open` / `https://mikeywa.icu` |
+| 左下角作者主页 / 作者链接 | 页面底部左侧通往 Mikey 个人主页、使用 NCM 同款页边距的小字外链 | `.landing-footer` / `author_home_open` / `https://mikeywa.icu` |
 | 正在生成的记录 / 等待本地完成 | 可从固定任务页继续轮询、拆图和抠图的未完成作品 | `?job=:id` / `resumeUrl` / `owned` / `useLocalMatting` |
 | 按名字找作品 / 搜作品 | 使用生成时完整名字精确查询已完成作品 | `.work-search-form` / `/api/works/search?name=` |
 | 确认生成和移除按钮 / 上传后操作栏 | 与名字输入框同排、同高、底边对齐的操作组 | `.photo-details` / `.photo-detail-actions` / `.generate-button` / `.remove-photo` |
@@ -48,14 +48,13 @@
 | 装饰开关 | 互动页顶部的贴纸显示切换，作品主人设置持久化 | `.experience-display-controls` / `decorations` / `stickerSlots` / `PATCH /api/jobs/:id/appearance` |
 | 主页图标 / 小房子 | 互动页左上角返回主页入口 | `.experience-top-actions` / `.experience-home` / `House` / `onExit` |
 | 背景音乐开关 | 互动页左上角的 BGM 播放与暂停 | `.experience-bgm-toggle` / `musicEnabled` / `audioPlaying` / `toggleMusic` |
-| 保存视频 | 保存图片半弹窗底部的本机渲染入口 | `.share-video-section` / `.share-save-video` / `?render=1` |
+| 保存视频（测试） | 保存图片半弹窗底部的无填充次要按钮、本机渲染入口 | `.share-video-section` / `.share-save-video` / `?render=1` |
 | 渲染进度页 | 本机视频生成状态 | `LocalVideoRenderPage` |
 | 本机渲染器 | 按需加载 Remotion Web Renderer | `localVideoRender.js` / `renderVideoLocally` |
 | 再次下载视频 | Blob 下载兜底按钮 | `triggerDownload` |
 | 访客再生成视频 | 分享访客本机反复渲染 | `LocalVideoRenderPage`，不调用服务端渲染接口 |
 | 永久链接 | 作品或 DEMO 地址 | `?view=:id` / `?demo=:id` |
 | 分享二维码 / 表情二维码 | 小圆点、少量深彩点、圆形定位点与圆角方形头像底板的 1080×1080 永久链接码 | `QrShareBubble` / `buildQrCodeDataUrl` / `drawFinder` / `.qr-share-bubble` / `.qr-bubble-image` |
-| 视频测试提示 | 保存视频按钮下的速度说明 | `.share-video-section > p` |
 | 团子示例 | 团子九表情互动页 | `?demo=tuanzi` / `tuanziAvatars` |
 | Jennie 示例 | 由永久作品 `cec29c58067e4bdc9b6c197b540e7b74` 同步的互动页 | `?demo=jennie` / `featuredJennieAvatars` |
 | 耙耙柑 / 小太阳 | 鹦鹉互动页 | `?demo=sun-conure` / `sunConureAvatars` |

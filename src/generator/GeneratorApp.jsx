@@ -951,11 +951,9 @@ function SaveImagesSheet({job, appearance, onClose, onRender}) {
             ))}
           </div>
           <button type="button" className="share-action-button share-action-primary share-save-all" onClick={saveAllFaces} disabled={savingAll || preparedAssets.length !== job.avatars.length} data-uisfx={preparedAssets.length === job.avatars.length ? "start" : "blocked"} data-analytics-action="faces_save_all"><DownloadSimple weight="bold" />{saveAllState || "一键保存 9 张"}</button>
-          <p className="share-save-all-note">手机会打开系统保存，电脑会下载含 9 张原图的 ZIP</p>
           {error ? <p className="share-sheet-error">{error}</p> : null}
           <div className="share-video-section">
-            <button type="button" className="share-save-video" onClick={saveVideo} data-uisfx="start" data-analytics-action="video_generate" disabled={submitting}><DownloadSimple weight="bold" />{submitting ? "正在打开视频生成" : "保存视频"}</button>
-            <p>测试功能，生成比较慢，请保持页面打开</p>
+            <button type="button" className="share-save-video" onClick={saveVideo} data-uisfx="start" data-analytics-action="video_generate" disabled={submitting}><DownloadSimple weight="bold" />{submitting ? "正在打开视频生成（测试）" : "保存视频（测试）"}</button>
           </div>
         </div>
       </motion.section>
