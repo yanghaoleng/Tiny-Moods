@@ -39,16 +39,16 @@
 | 在用户电脑上拆图 | 浏览器拆格与抠白底 | `localMatting.js` / `matting.worker.js` |
 | 制作进度页 / 请不要关闭 | 图片生成和失败状态；成功后直接离开 | `JobStatus` / `completedJob` |
 | 互动页 | 永久作品体验 | `SharedJobExperience` / `JennieExperience` |
-| 底部三个分享按钮 / 放在外面的按钮 | 复制链接、保存图片、分享二维码三个直接入口 | `actionContent` / `.experience-share-action` / `link_copy` / `faces_open` / `qr_open` |
-| 保存图片半弹窗 | 从页面底部打开的九图保存层 | `SaveImagesSheet` / `.share-sheet` / `sheetOpen` |
+| 底部三个分享按钮 / 放在外面的按钮 | 复制链接、保存原图、分享二维码三个直接入口 | `actionContent` / `.experience-share-action` / `link_copy` / `ai_original_open` / `qr_open` |
+| 保存原图弹窗 | 从页面底部打开的 AI 九宫格原图层 | `SaveImagesSheet` / `.share-sheet` / `sheetOpen` |
 | 保存 9 张透明图片 / 九图入口 | 打开透明图平铺保存页 | `.experience-share-action` / `setSheetOpen(true)` |
-| 九图平铺 / 九张列表 | 3×3 透明原图网格 | `.share-face-grid` / `.share-face-item` |
-| 一键保存 9 张 / 下载压缩包 | 位于九图列表底部；优先手机系统多图保存，否则直接下载服务端预制白底 JPG ZIP | `saveAllFaces` / `prepareAvatarFiles` / `downloadArchiveUrl` / `faces-jpg-v2.zip` / `.share-save-all` |
+| AI 原图 / 抠图前的图 | 火山引擎返回的完整九宫格原文件 | `originalSheetFilename` / `originalImageUrl` / `/generated/:id/ai-original` |
+| 下载 AI 原图 | 不转码、不拆分、不打包，直接下载原始母图 | `saveOriginalImage` / `.share-save-original` / `ai_original_download` |
 | 背景开关 | 互动页顶部的 5 种浅色轮播/纯白切换，作品主人设置持久化 | `.experience-display-controls` / `backgroundMode` / `carouselBackgrounds` / `PATCH /api/jobs/:id/appearance` |
 | 装饰开关 | 互动页顶部的贴纸显示切换，作品主人设置持久化 | `.experience-display-controls` / `decorations` / `stickerSlots` / `PATCH /api/jobs/:id/appearance` |
 | 主页图标 / 小房子 | 互动页左上角返回主页入口 | `.experience-top-actions` / `.experience-home` / `House` / `onExit` |
 | 背景音乐开关 | 互动页左上角的 BGM 播放与暂停 | `.experience-bgm-toggle` / `musicEnabled` / `audioPlaying` / `toggleMusic` |
-| 保存视频（测试） | 保存图片半弹窗底部的无填充次要按钮、本机渲染入口 | `.share-video-section` / `.share-save-video` / `?render=1` |
+| 保存视频（测试） | 保存原图弹层底部的无填充次要按钮、本机渲染入口 | `.share-video-section` / `.share-save-video` / `?render=1` |
 | 渲染进度页 | 本机视频生成状态 | `LocalVideoRenderPage` |
 | 本机渲染器 | 按需加载 Remotion Web Renderer | `localVideoRender.js` / `renderVideoLocally` |
 | 再次下载视频 | Blob 下载兜底按钮 | `triggerDownload` |
@@ -65,7 +65,7 @@
 | 波纹 | 半调点阵高亮扩散 | `HalftoneRippleBackground` |
 | 自动慢慢换一个 / Hover 不打断 | 独立于悬停状态的自动换装计时器 | `AUTO_CHANGE_INTERVAL` / `changeLook`；头像按钮无 `whileHover` |
 | 立即播放音乐 / 首次点击补播 | BGM 自动播放与浏览器策略回退 | `autoPlay` / `preload="auto"` / `tryStartAudio` |
-| WebP 原图 / 白底 JPG | 长期存储和互动浏览走 1080px 透明 WebP；单张与 ZIP 下载统一为白底 JPG | `avatar.src` / `avatar.downloadSrc` / `writeFaceWebp` / `createFaceJpegBuffer` |
+| 互动 WebP / 抠图后图片 | 九张 1080px 透明 WebP，只用于网页互动、二维码和视频 | `avatar.src` / `writeFaceWebp` / `/generated/:id/face-XX.webp` |
 | 全部图片压缩 | 静态 PNG 批量转 WebP | `npm run images:optimize` / `scripts/optimize-static-images.mjs` |
 | 图片长缓存 / 打开更快 | 指纹静态资源和作品 WebP 的一年不可变缓存 | `/assets` / `express.static(..., {maxAge: "1y", immutable: true})` / `/generated/:id/face-XX.webp` |
 | 按钮音效 / 电影感音效 | UI SFX `10 Cinematic` 语义音效层 | `uiSfx` / `playUISfx` / `data-uisfx` |

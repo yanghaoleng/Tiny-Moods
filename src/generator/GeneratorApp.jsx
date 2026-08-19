@@ -173,11 +173,8 @@ const demoJobForProfile = (profile) => ({
   status: "ready",
   videoStatus: "local",
   pageUrl: `${import.meta.env.BASE_URL}?demo=${encodeURIComponent(profile.id)}`,
-  avatars: profile.avatars.map((avatar, index) => ({
-    ...avatar,
-    downloadSrc: `${import.meta.env.BASE_URL}generated/demo-${profile.id}/face-${String(index + 1).padStart(2, "0")}.jpg`,
-  })),
-  downloadArchiveUrl: `${import.meta.env.BASE_URL}generated/demo-${profile.id}/faces-jpg-v2.zip`,
+  avatars: profile.avatars,
+  originalImageUrl: `${import.meta.env.BASE_URL}generated/demo-${profile.id}/ai-original`,
   appearance: defaultAppearance,
 });
 
@@ -802,25 +799,6 @@ const copyText = async (value) => {
 
 const safeFilenamePart = (value) => value.replace(/[\\/:*?"<>|]/g, "-").trim() || "作品";
 
-const prepareAvatarFiles = async (avatars, title, onProgress = () => {}) => {
-  let completed = 0;
-  return Promise.all(avatars.map(async (avatar, index) => {
-    const source = avatar.downloadSrc || avatar.src;
-    const response = await fetch(source);
-    if (!response.ok) throw new Error(`第 ${index + 1} 张图片读取失败`);
-    const mimeType = response.headers.get("content-type") || "image/jpeg";
-    const bytes = new Uint8Array(await response.arrayBuffer());
-    const file = new File(
-      [bytes],
-      `${safeFilenamePart(title)}-白底表情-${String(index + 1).padStart(2, "0")}.jpg`,
-      {type: "image/jpeg"},
-    );
-    completed += 1;
-    onProgress(completed, avatars.length);
-    return {file};
-  }));
-};
-
 const startFileDownload = (url) => {
   const link = document.createElement("a");
   link.href = url;
@@ -831,43 +809,8 @@ const startFileDownload = (url) => {
 
 function SaveImagesSheet({job, appearance, onClose, onRender}) {
   const reduceMotion = useReducedMotion();
-  const [preparedAssets, setPreparedAssets] = useState([]);
-  const preparedFiles = useMemo(() => preparedAssets.map(({file}) => file), [preparedAssets]);
-  const [saveAllState, setSaveAllState] = useState("");
-  const [savingAll, setSavingAll] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const saveAllTimer = useRef(null);
-
-  useEffect(() => {
-    const canShareFiles = window.matchMedia("(pointer: coarse)").matches && typeof navigator.share === "function";
-    if (!canShareFiles) return undefined;
-    if (preparedAssets.length === job.avatars.length) return undefined;
-    let active = true;
-    void prepareAvatarFiles(job.avatars, job.title, (done, total) => {
-      if (active) setSaveAllState(`正在准备 JPG ${done} / ${total}`);
-    })
-      .then((assets) => {
-        if (!active) return;
-        setPreparedAssets(assets);
-        setSaveAllState("");
-      })
-      .catch((requestError) => {
-        if (!active) return;
-        setSaveAllState("");
-        setError(requestError.message);
-      });
-    return () => { active = false; };
-  }, [job.avatars, job.title, preparedAssets.length]);
-
-  useEffect(() => {
-    if (!job.downloadArchiveUrl) return undefined;
-    const controller = new AbortController();
-    void fetch(job.downloadArchiveUrl, {cache: "force-cache", signal: controller.signal})
-      .then((response) => response.ok ? response.arrayBuffer() : Promise.reject(new Error("ZIP 预取失败")))
-      .catch(() => {});
-    return () => controller.abort();
-  }, [job.downloadArchiveUrl]);
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -877,7 +820,6 @@ function SaveImagesSheet({job, appearance, onClose, onRender}) {
     return () => {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", onKeyDown);
-      window.clearTimeout(saveAllTimer.current);
     };
   }, [onClose]);
 
@@ -892,33 +834,17 @@ function SaveImagesSheet({job, appearance, onClose, onRender}) {
     }
   };
 
-  const saveAllFaces = async () => {
-    if (savingAll) return;
-    setSavingAll(true);
-    setError("");
-    try {
-      const useSystemSave = window.matchMedia("(pointer: coarse)").matches && navigator.canShare?.({files: preparedFiles});
-      if (useSystemSave) {
-        setSaveAllState("请选择系统保存");
-        await navigator.share({files: preparedFiles, title: `${job.title}的9张白底表情`});
-        setSaveAllState("已打开系统保存");
-      } else {
-        if (!job.downloadArchiveUrl) throw new Error("压缩包尚未准备好");
-        startFileDownload(job.downloadArchiveUrl);
-        setSaveAllState("已开始下载 ZIP");
-      }
-      trackEvent("interaction", {action: "faces_save_completed", method: useSystemSave ? "system_share" : "zip"}, {jobId: job.id});
-      playUISfx("success");
-      window.clearTimeout(saveAllTimer.current);
-      saveAllTimer.current = window.setTimeout(() => setSaveAllState(""), 2200);
-    } catch (requestError) {
-      setSaveAllState("");
-      if (requestError.name === "AbortError") return;
-      setError("批量保存没有完成，可以点开或长按每张图片保存");
+  const saveOriginalImage = () => {
+    if (!job.originalImageUrl) {
+      setError("这个旧作品没有保留裁剪前的 AI 原图");
       playUISfx("error");
-    } finally {
-      setSavingAll(false);
+      return;
     }
+    const downloadUrl = new URL(job.originalImageUrl, window.location.href);
+    downloadUrl.searchParams.set("download", "1");
+    startFileDownload(downloadUrl.href);
+    trackEvent("interaction", {action: "ai_original_download"}, {jobId: job.id});
+    playUISfx("success");
   };
 
   return (
@@ -933,21 +859,18 @@ function SaveImagesSheet({job, appearance, onClose, onRender}) {
         aria-modal="true"
         aria-labelledby="share-faces-title"
       >
-        <button type="button" className="share-sheet-close" onClick={onClose} data-uisfx="close" data-analytics-action="save_images_close" aria-label="关闭保存图片"><X weight="bold" /></button>
+        <button type="button" className="share-sheet-close" onClick={onClose} data-uisfx="close" data-analytics-action="save_images_close" aria-label="关闭保存原图"><X weight="bold" /></button>
         <div className="share-faces-view">
           <div className="share-faces-heading">
-            <h2 id="share-faces-title">保存九张图片</h2>
-            <p>白底 JPG，可点开或长按单张保存</p>
+            <h2 id="share-faces-title">保存 AI 原图</h2>
+            <p>火山引擎生成后、裁剪和抠图前的完整九宫格</p>
           </div>
-          <div className="share-face-grid" role="list" aria-label="九张白底 JPG 表情">
-            {job.avatars.map((avatar, index) => (
-              <a key={avatar.src} className="share-face-item" href={avatar.downloadSrc || avatar.src} target="_blank" rel="noreferrer" role="listitem" aria-label={`查看第 ${index + 1} 张大图`} data-uisfx="open" data-analytics-action="face_open" data-analytics-target={String(index + 1)}>
-                <img src={avatar.src} alt={`${job.title}白底表情 ${index + 1}`} decoding="async" />
-                <span aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
-              </a>
-            ))}
-          </div>
-          <button type="button" className="share-action-button share-action-primary share-save-all" onClick={saveAllFaces} disabled={savingAll} data-uisfx="start" data-analytics-action="faces_save_all"><DownloadSimple weight="bold" />{saveAllState || "一键保存 9 张"}</button>
+          {job.originalImageUrl ? (
+            <a className="share-original-preview" href={job.originalImageUrl} target="_blank" rel="noreferrer" aria-label="查看 AI 生成原图" data-uisfx="open" data-analytics-action="ai_original_open">
+              <img src={job.originalImageUrl} alt={`${job.title}裁剪和抠图前的 AI 九宫格原图`} decoding="async" />
+            </a>
+          ) : <p className="share-original-missing">这个旧作品完成时没有保留 AI 原图，无法恢复。</p>}
+          <button type="button" className="share-action-button share-action-primary share-save-original" onClick={saveOriginalImage} disabled={!job.originalImageUrl} data-uisfx={job.originalImageUrl ? "start" : "blocked"} data-analytics-action="ai_original_download"><DownloadSimple weight="bold" />下载 AI 原图</button>
           {error ? <p className="share-sheet-error">{error}</p> : null}
           <div className="share-video-section">
             <button type="button" className="share-save-video" onClick={saveVideo} data-uisfx="start" data-analytics-action="video_generate" disabled={submitting}><DownloadSimple weight="bold" />{submitting ? "正在打开视频生成（测试）" : "保存视频（测试）"}</button>
@@ -1200,10 +1123,10 @@ function SharedJobExperience({job, onExit, onRender, embedded = false}) {
               <span className="experience-action-label-full">{copyState || "复制链接"}</span>
               <span className="experience-action-label-short">{copyState || "复制"}</span>
             </button>
-            <button type="button" className="experience-share-action" onClick={() => { setQrOpen(false); setSheetOpen(true); }} data-uisfx="open" data-analytics-action="faces_open" aria-label="打开保存图片半弹窗">
+            <button type="button" className="experience-share-action" onClick={() => { setQrOpen(false); setSheetOpen(true); }} data-uisfx="open" data-analytics-action="ai_original_open" aria-label="打开保存 AI 原图弹窗">
               <ImagesSquare weight="bold" aria-hidden="true" />
-              <span className="experience-action-label-full">保存图片</span>
-              <span className="experience-action-label-short">保存</span>
+              <span className="experience-action-label-full">保存原图</span>
+              <span className="experience-action-label-short">原图</span>
             </button>
             <button type="button" className="experience-share-action" onClick={() => { setSheetOpen(false); setQrOpen((value) => !value); }} data-uisfx="open" data-analytics-action="qr_open" aria-label="打开分享二维码">
               <QrCode weight="bold" aria-hidden="true" />

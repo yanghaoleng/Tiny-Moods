@@ -376,7 +376,7 @@
 .share-sheet-back:focus-visible,
 .share-action-button:focus-visible,
 .share-faces-entry:focus-visible,
-.share-face-item:focus-visible,
+.share-original-preview:focus-visible,
 .share-save-video:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--generator-pink) 68%, transparent);
   outline-offset: 3px;
@@ -1319,7 +1319,7 @@
 .share-sheet-error { margin: 12px 0 0; color: #b13b5f; font-size: 0.75rem; font-weight: 850; }
 .share-action-button:active,
 .share-faces-entry:active,
-.share-face-item:active,
+.share-original-preview:active,
 .share-sheet-back:active,
 .share-save-video:active,
 .share-sheet-close:active { transform: scale(0.97); }
@@ -2267,41 +2267,28 @@
 .share-faces-heading h2 { margin: 0; font-size: 1.55rem; font-weight: 1000; letter-spacing: -0.03em; }
 .share-faces-heading p { margin: 5px 0 0; color: #686367; font-size: 0.76rem; font-weight: 750; }
 
-.share-save-all {
+.share-save-original {
   width: 100%;
   margin-top: 18px;
 }
 
-.share-save-all:disabled { opacity: 0.5; cursor: wait; }
+.share-save-original:disabled { opacity: 0.42; cursor: not-allowed; }
 
-.share-face-grid {
+.share-original-preview {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  margin-top: 16px;
-}
-
-.share-face-item {
-  position: relative;
-  display: grid;
+  width: min(380px, 100%);
   aspect-ratio: 1;
   place-items: center;
   overflow: hidden;
+  margin-top: 16px;
   border: 1px solid rgb(29 27 30 / 0.14);
-  border-radius: 11px;
+  border-radius: 14px;
   color: #1d1b1e;
-  background-color: #f4f3f3;
-  background-image:
-    linear-gradient(45deg, rgb(29 27 30 / 0.045) 25%, transparent 25%),
-    linear-gradient(-45deg, rgb(29 27 30 / 0.045) 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, rgb(29 27 30 / 0.045) 75%),
-    linear-gradient(-45deg, transparent 75%, rgb(29 27 30 / 0.045) 75%);
-  background-position: 0 0, 0 7px, 7px -7px, -7px 0;
-  background-size: 14px 14px;
+  background: #f4f3f3;
   text-decoration: none;
 }
 
-.share-face-item img {
+.share-original-preview img {
   display: block;
   width: 100%;
   height: 100%;
@@ -2309,18 +2296,16 @@
   -webkit-touch-callout: default;
 }
 
-.share-face-item > span {
-  position: absolute;
-  right: 5px;
-  bottom: 5px;
-  min-width: 22px;
-  padding: 2px 4px;
-  border-radius: 5px;
-  color: #f9f8f8;
-  background: rgb(29 27 30 / 0.8);
-  font-size: 0.58rem;
-  font-weight: 900;
-  line-height: 1.2;
+.share-original-missing {
+  margin: 18px 0 0;
+  padding: 18px;
+  border: 1px solid rgb(29 27 30 / 0.14);
+  border-radius: 14px;
+  color: #686367;
+  background: #f4f3f3;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.5;
   text-align: center;
 }
 
@@ -2525,8 +2510,6 @@
 
   .share-qr-preview { width: min(164px, 52%); margin-top: 16px; }
 
-  .share-face-grid { gap: 7px; }
-
 }
 
 /* Interaction-page share actions: QR bubble and bottom save sheet. */
@@ -2539,8 +2522,9 @@
 .share-sheet,
 .share-sheet.is-white,
 .share-sheet:not(.is-white) {
-  width: min(760px, 100%);
-  max-height: min(76dvh, 760px);
+  width: min(560px, 100%);
+  max-height: min(88dvh, 820px);
+  overflow-y: auto;
   padding: 28px clamp(20px, 4vw, 34px) max(28px, calc(env(safe-area-inset-bottom) + 20px));
   border-right: 1px solid rgb(29 27 30 / 0.18);
   border-bottom: 0;
@@ -2550,10 +2534,7 @@
 
 .share-faces-heading { padding-right: 48px; }
 
-.share-face-grid {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 9px;
-}
+.share-original-preview { margin-right: auto; margin-left: auto; }
 
 .share-video-section {
   margin-top: 10px;
@@ -2672,7 +2653,7 @@
     border-radius: 26px 26px 0 0;
   }
 
-  .share-face-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .share-original-preview { width: min(330px, 100%); }
 }
 
 @media (prefers-reduced-motion: reduce) {

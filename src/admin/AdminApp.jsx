@@ -91,6 +91,8 @@ const actionText = {
   save_images_close: "关闭保存图片",
   face_open: "查看单张大图",
   faces_save_all: "保存九张图片",
+  ai_original_open: "打开 AI 原图",
+  ai_original_download: "下载 AI 原图",
   qr_open: "打开分享二维码",
   qr_close: "关闭分享二维码",
   qr_save: "保存二维码",
@@ -310,7 +312,7 @@ function JobDetail({job, detail, loading, onClose}) {
               <div><dt>支付/打赏</dt><dd>{current.order?.provider === "voluntary_tip" ? `自愿打赏 / 建议 ¥${current.order.suggestedDonationCny || current.suggestedDonationCny || "-"}` : current.order ? `${current.order.channel} / ¥${current.order.amountCny}` : current.payment?.status || "-"}</dd></div>
             </dl>
             {current.generationError ? <div className="admin-generation-error"><strong>失败详情</strong><p>{current.generationError}</p></div> : null}
-            {current.sheetUrl ? <div className="admin-sheet"><h4>待处理九宫格母图</h4><img src={current.sheetUrl} alt={`${current.title} 九宫格母图`} /></div> : null}
+            {current.sheetUrl ? <div className="admin-sheet"><h4>{current.status === "ready" ? "AI 生成原图" : "待处理九宫格母图"}</h4><img src={current.sheetUrl} alt={`${current.title} 九宫格母图`} /></div> : null}
           </section>
 
           <section className="admin-detail-section">

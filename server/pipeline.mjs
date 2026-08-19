@@ -1,4 +1,4 @@
-import {mkdir} from "node:fs/promises";
+import {mkdir, writeFile} from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
 import {resolveImageModel} from "./image-models.mjs";
@@ -87,9 +87,22 @@ export const getSeedreamBuffer = async (sourceBuffer, selectedModel) => {
 export const buildAvatarManifest = (jobId, title, _publicOrigin, themes = fallbackPalette) => themes.map((theme, index) => ({
   ...theme,
   src: `/generated/${jobId}/face-${String(index + 1).padStart(2, "0")}.webp`,
-  downloadSrc: `/generated/${jobId}/face-${String(index + 1).padStart(2, "0")}.jpg`,
   label: `${title} 表情 ${index + 1}`,
 }));
+
+const originalSheetExtension = async (buffer) => {
+  const {format} = await sharp(buffer).metadata();
+  if (format === "png") return "png";
+  if (format === "webp") return "webp";
+  return "jpg";
+};
+
+const writeOriginalSheet = async (buffer, jobDirectory) => {
+  const extension = await originalSheetExtension(buffer);
+  const filename = `sheet-original.${extension}`;
+  await writeFile(path.join(jobDirectory, filename), buffer);
+  return filename;
+};
 
 async function makeDemoSheet(sourceBuffer, jobDirectory) {
   const mask = Buffer.from('<svg width="1100" height="1100"><ellipse cx="550" cy="570" rx="510" ry="530" fill="white"/></svg>');
@@ -103,6 +116,7 @@ async function makeDemoSheet(sourceBuffer, jobDirectory) {
     .composite([{input: portrait, left: 132, top: 132}])
     .jpeg()
     .toBuffer();
+  const filename = "sheet-original.jpg";
   await sharp({create: {width: 4095, height: 4095, channels: 3, background: "#ffffff"}})
     .composite(Array.from({length: 9}, (_, index) => ({
       input: tile,
@@ -110,7 +124,8 @@ async function makeDemoSheet(sourceBuffer, jobDirectory) {
       top: Math.floor(index / 3) * 1365,
     })))
     .jpeg({quality: 92})
-    .toFile(path.join(jobDirectory, "sheet.jpg"));
+    .toFile(path.join(jobDirectory, filename));
+  return filename;
 }
 
 export async function runGenerationPipeline({job, sourceBuffer, projectRoot, generatedRoot, publicOrigin, update}) {
@@ -128,29 +143,27 @@ export async function runGenerationPipeline({job, sourceBuffer, projectRoot, gen
 
   if (process.env.GENERATOR_DEMO_MODE === "1") {
     await update({status: "generating", stage: "正在准备本地测试母图", progress: 34});
-    await makeDemoSheet(sourceBuffer, jobDirectory);
+    const originalSheetFilename = await makeDemoSheet(sourceBuffer, jobDirectory);
     await update({
       status: "awaiting_client_processing",
       stage: "正在浏览器里拆图和抠背景",
       progress: 50,
       sheetUrl: `${publicOrigin}/api/jobs/${job.id}/sheet`,
+      originalSheetFilename,
     });
     return;
   }
 
   await update({status: "generating", stage: `${selectedModel.label} 正在生成九宫格`, progress: 12});
   const seedreamResult = await getSeedreamBuffer(sourceBuffer, selectedModel);
-  await sharp(seedreamResult.buffer)
-    .rotate()
-    .flatten({background: "#ffffff"})
-    .jpeg({quality: 94, chromaSubsampling: "4:4:4"})
-    .toFile(path.join(jobDirectory, "sheet.jpg"));
+  const originalSheetFilename = await writeOriginalSheet(seedreamResult.buffer, jobDirectory);
   const generatedImageSize = selectedModel.size;
   await update({
     status: "awaiting_client_processing",
     stage: "正在浏览器里拆图和抠背景",
     progress: 50,
     sheetUrl: `${publicOrigin}/api/jobs/${job.id}/sheet`,
+    originalSheetFilename,
     seedreamUsage: seedreamResult.usage,
     seedreamRequestId: seedreamResult.requestId,
     generatedImageCount: 1,

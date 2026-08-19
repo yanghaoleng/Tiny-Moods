@@ -24,7 +24,6 @@
     "calligraph": "^1.4.1",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "fflate": "^0.8.2",
     "motion": "^12.23.24",
     "multer": "^2.2.0",
     "qrcode": "^1.5.4",

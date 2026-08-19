@@ -9,11 +9,8 @@ import {createAdminAuth} from "./admin.mjs";
 import {createAnalyticsStore, summarizeEvents} from "./analytics.mjs";
 import {getImageTheme} from "./background.mjs";
 import {
-  FACE_ARCHIVE_NAME,
-  createFaceJpegBuffer,
-  ensureFaceDownloadArchive,
   faceFilename,
-  writeFaceDownloadArchive,
+  writeDemoOriginalSheet,
   writeFaceWebp,
 } from "./face-assets.mjs";
 import {
@@ -46,7 +43,6 @@ const jobs = new Map();
 const orders = new Map();
 const rateHits = new Map();
 const workQueue = [];
-const faceArchiveBuilds = new Map();
 let activeWork = 0;
 const maxConcurrentWork = Math.max(1, Number(process.env.MAX_CONCURRENT_JOBS || 1));
 const maxOrdersPerHour = Math.max(1, Number(process.env.MAX_ORDERS_PER_HOUR || 10));
@@ -83,6 +79,24 @@ const ensureFacePreview = async (directory, index) => {
     await writeFaceWebp(faceFilename(directory, index, "png"), preview);
   }
   return preview;
+};
+const findOriginalSheetFilename = async (job, directory) => {
+  const candidates = [
+    job.originalSheetFilename,
+    "sheet-original.jpg",
+    "sheet-original.png",
+    "sheet-original.webp",
+    "sheet.jpg",
+  ].filter(Boolean);
+  for (const candidate of [...new Set(candidates)]) {
+    try {
+      await stat(path.join(directory, candidate));
+      return candidate;
+    } catch {
+      // Older completed jobs may no longer have their original sheet.
+    }
+  }
+  return "";
 };
 const demoProfiles = [
   {
@@ -146,6 +160,7 @@ const publicJob = (job) => {
     visitorId: _visitorId,
     videoUrl: _videoUrl,
     renderError: _renderError,
+    originalSheetFilename: _originalSheetFilename,
     ...safe
   } = job;
   safe.videoStatus = "local";
@@ -160,7 +175,7 @@ const publicJob = (job) => {
       ...(avatar.downloadSrc ? {downloadSrc: withAssetRevision(avatar.downloadSrc)} : {}),
     }));
   }
-  if (safe.downloadArchiveUrl) safe.downloadArchiveUrl = withAssetRevision(safe.downloadArchiveUrl);
+  if (safe.originalImageUrl) safe.originalImageUrl = withAssetRevision(safe.originalImageUrl);
   return safe;
 };
 
@@ -210,7 +225,7 @@ const adminJob = (job, request, analyticsMetrics = {}) => {
   const fixedPath = job.status === "ready" && job.pageUrl ? job.pageUrl : `/?job=${job.id}`;
   return {
     ...safe,
-    sheetUrl: job.status === "awaiting_client_processing" ? `/api/admin/jobs/${job.id}/sheet` : null,
+    sheetUrl: safe.originalImageUrl || (job.status === "awaiting_client_processing" ? `/api/admin/jobs/${job.id}/sheet` : null),
     shareUrl: job.pageUrl ? `${origin}${job.pageUrl.startsWith("/") ? "" : "/"}${job.pageUrl}` : null,
     fixedUrl: `${origin}${fixedPath}`,
     adminOpenUrl: job.status === "ready" && job.pageUrl
@@ -316,13 +331,20 @@ const restoreState = async () => {
         delete job.videoUrl;
         delete job.renderError;
         job.videoStatus = "local";
-        job.avatars = job.avatars.map((avatar, index) => ({
+        job.avatars = job.avatars.map(({downloadSrc: _downloadSrc, ...avatar}, index) => ({
           ...avatar,
           src: `/generated/${job.id}/face-${String(index + 1).padStart(2, "0")}.webp`,
-          downloadSrc: `/generated/${job.id}/face-${String(index + 1).padStart(2, "0")}.jpg`,
           label: `${job.title} 表情 ${index + 1}`,
         }));
-        job.downloadArchiveUrl = `/generated/${job.id}/${FACE_ARCHIVE_NAME}`;
+        delete job.downloadArchiveUrl;
+        const originalSheetFilename = await findOriginalSheetFilename(job, directory);
+        if (originalSheetFilename) {
+          job.originalSheetFilename = originalSheetFilename;
+          job.originalImageUrl = `/generated/${job.id}/ai-original`;
+        } else {
+          delete job.originalSheetFilename;
+          delete job.originalImageUrl;
+        }
         job.pageUrl = `/?view=${job.id}`;
         await persistJob(job);
       }
@@ -348,7 +370,7 @@ const ensureDemoJobs = async () => {
     const id = `demo-${profile.id}`;
     const directory = path.join(generatedRoot, id);
     const existing = jobs.get(id);
-    const demoAssetsVersion = 6;
+    const demoAssetsVersion = 7;
     await mkdir(directory, {recursive: true});
     const facePaths = [];
     for (let index = 0; index < profile.sources.length; index += 1) {
@@ -362,8 +384,15 @@ const ensureDemoJobs = async () => {
       }
     }
     const themes = await Promise.all(facePaths.map(getImageTheme));
-    await ensureFaceDownloadArchive(directory, profile.title);
+    const originalSheetFilename = "sheet-original.jpg";
+    try {
+      if (existing?.demoAssetsVersion !== demoAssetsVersion) throw new Error("refresh demo original");
+      await stat(path.join(directory, originalSheetFilename));
+    } catch {
+      await writeDemoOriginalSheet(profile.sources, path.join(directory, originalSheetFilename));
+    }
     await Promise.all(Array.from({length: 9}, (_, index) => rm(faceFilename(directory, index + 1, "png"), {force: true})));
+    await rm(path.join(directory, "faces-jpg-v2.zip"), {force: true});
     const createdAt = existing?.createdAt || new Date().toISOString();
     const job = {
       ...existing,
@@ -377,7 +406,8 @@ const ensureDemoJobs = async () => {
       progress: 100,
       appearance: normalizeAppearance(existing?.appearance || defaultAppearance),
       avatars: buildAvatarManifest(id, profile.title, "", themes),
-      downloadArchiveUrl: `/generated/${id}/${FACE_ARCHIVE_NAME}`,
+      originalSheetFilename,
+      originalImageUrl: `/generated/${id}/ai-original`,
       pageUrl: `/?demo=${profile.id}`,
       permanent: true,
       expiresAt: null,
@@ -387,6 +417,7 @@ const ensureDemoJobs = async () => {
     };
     delete job.videoUrl;
     delete job.renderError;
+    delete job.downloadArchiveUrl;
     jobs.set(id, job);
     await persistJob(job);
   }
@@ -547,14 +578,11 @@ app.get("/api/admin/jobs/:id/events", requireAdmin, async (request, response) =>
 app.get("/api/admin/jobs/:id/sheet", requireAdmin, async (request, response) => {
   const job = jobs.get(request.params.id);
   if (!job) return response.status(404).end();
-  const filename = path.join(generatedRoot, job.id, "sheet.jpg");
-  try {
-    await stat(filename);
-  } catch {
-    return response.status(404).end();
-  }
+  const directory = path.join(generatedRoot, job.id);
+  const originalSheetFilename = await findOriginalSheetFilename(job, directory);
+  if (!originalSheetFilename) return response.status(404).end();
   response.setHeader("Cache-Control", "private, no-store");
-  response.sendFile(filename);
+  response.sendFile(path.join(directory, originalSheetFilename));
 });
 
 app.get("/api/admin/jobs/:id/resume", requireAdmin, (request, response) => {
@@ -822,11 +850,14 @@ app.patch("/api/jobs/:id/appearance", async (request, response) => {
   response.json({appearance: next.appearance});
 });
 
-app.get("/api/jobs/:id/sheet", (request, response) => {
+app.get("/api/jobs/:id/sheet", async (request, response) => {
   const job = jobs.get(request.params.id);
   if (!job || !canProcessJob(request, job)) return response.status(404).end();
+  const directory = path.join(generatedRoot, job.id);
+  const originalSheetFilename = await findOriginalSheetFilename(job, directory);
+  if (!originalSheetFilename) return response.status(404).end();
   response.setHeader("Cache-Control", "private, no-store");
-  response.sendFile(path.join(generatedRoot, job.id, "sheet.jpg"));
+  response.sendFile(path.join(directory, originalSheetFilename));
 });
 
 app.post("/api/jobs/:id/faces", faceUpload.array("faces", 9), async (request, response) => {
@@ -841,15 +872,17 @@ app.post("/api/jobs/:id/faces", faceUpload.array("faces", 9), async (request, re
     const facePaths = Array.from({length: 9}, (_, index) => faceFilename(directory, index + 1, "webp"));
     await Promise.all(request.files.map((file, index) => writeFaceWebp(file.buffer, facePaths[index])));
     const themes = await Promise.all(facePaths.map(getImageTheme));
-    await writeFaceDownloadArchive(directory, job.title);
     await Promise.all(Array.from({length: 9}, (_, index) => rm(faceFilename(directory, index + 1, "png"), {force: true})));
+    const originalSheetFilename = await findOriginalSheetFilename(job, directory);
     const avatars = buildAvatarManifest(job.id, job.title, publicOriginFor(request), themes);
     const next = await updateJob(job.id, {
       status: "ready",
-      stage: "轻量表情、白底 JPG 和互动页已完成，视频可在浏览器本机生成",
+      stage: "AI 原图、轻量表情和互动页已完成，视频可在浏览器本机生成",
       progress: 100,
       avatars,
-      downloadArchiveUrl: `/generated/${job.id}/${FACE_ARCHIVE_NAME}`,
+      originalSheetFilename: originalSheetFilename || undefined,
+      originalImageUrl: originalSheetFilename ? `/generated/${job.id}/ai-original` : undefined,
+      downloadArchiveUrl: undefined,
       assetRevision: Date.now(),
       videoStatus: "local",
       pageUrl: `/?view=${job.id}`,
@@ -857,7 +890,6 @@ app.post("/api/jobs/:id/faces", faceUpload.array("faces", 9), async (request, re
       expiresAt: null,
       completedAt: new Date().toISOString(),
     });
-    await rm(path.join(directory, "sheet.jpg"), {force: true});
     response.status(201).json(publicJob(next));
   } catch (error) {
     response.status(400).json({error: "抠图结果无法读取，请重新处理"});
@@ -880,37 +912,20 @@ app.post("/api/public/jobs/:id/renders", async (request, response) => {
 app.get("/generated/:id/:filename", async (request, response) => {
   const job = jobs.get(request.params.id);
   if (!job) return response.status(404).end();
-  if (!/^(?:face-\d{2}\.(?:jpg|png|webp)|faces-jpg-v2\.zip|video\.mp4)$/.test(request.params.filename)) return response.status(404).end();
+  if (!/^(?:face-\d{2}\.(?:png|webp)|ai-original|video\.mp4)$/.test(request.params.filename)) return response.status(404).end();
   response.setHeader("Cache-Control", request.params.filename === "video.mp4" ? "private, no-cache" : "private, max-age=31536000, immutable");
   const directory = path.join(generatedRoot, request.params.id);
   const filename = path.join(directory, request.params.filename);
   const title = String(job.title || "Tiny Moods").replace(/[<>/\\]/g, "").trim() || "Tiny Moods";
 
-  if (request.params.filename === FACE_ARCHIVE_NAME) {
-    try {
-      let archiveTask = faceArchiveBuilds.get(job.id);
-      if (!archiveTask) {
-        archiveTask = ensureFaceDownloadArchive(directory, title).finally(() => faceArchiveBuilds.delete(job.id));
-        faceArchiveBuilds.set(job.id, archiveTask);
-      }
-      const archive = await archiveTask;
-      return response.download(archive, `${title}-9张白底表情.zip`);
-    } catch {
-      return response.status(404).end();
-    }
-  }
-
-  const jpegMatch = request.params.filename.match(/^face-(\d{2})\.jpg$/);
-  if (jpegMatch) {
-    try {
-      const source = faceFilename(directory, Number(jpegMatch[1]), "webp");
-      const jpeg = await createFaceJpegBuffer(source);
-      response.type("jpeg");
-      response.setHeader("Content-Disposition", `inline; filename="face-${jpegMatch[1]}.jpg"`);
-      return response.send(jpeg);
-    } catch {
-      return response.status(404).end();
-    }
+  if (request.params.filename === "ai-original") {
+    if (!job.permanent) return response.status(404).end();
+    const originalSheetFilename = await findOriginalSheetFilename(job, directory);
+    if (!originalSheetFilename) return response.status(404).end();
+    const extension = path.extname(originalSheetFilename) || ".jpg";
+    const originalFile = path.join(directory, originalSheetFilename);
+    if (request.query.download === "1") return response.download(originalFile, `${title}-AI生成原图${extension}`);
+    return response.sendFile(originalFile);
   }
 
   if (request.params.filename === "video.mp4" && request.query.download === "1") {
