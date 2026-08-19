@@ -1,5 +1,5 @@
 const OUTPUT_SIZE = 1365;
-const CELL_INSET_RATIO = 0;
+const CELL_INSET_RATIO = 0.006;
 
 const canvasToPng = (canvas) => new Promise((resolve, reject) => {
   canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("PNG 导出失败")), "image/png");

@@ -5,7 +5,6 @@ import { House } from "@phosphor-icons/react/House";
 import { SpeakerHigh } from "@phosphor-icons/react/SpeakerHigh";
 import { SpeakerSlash } from "@phosphor-icons/react/SpeakerSlash";
 import HalftoneRippleBackground from "./HalftoneRippleBackground";
-import UISoundToggle from "./UISoundToggle";
 
 import avatar02 from "../assets/image 2-1.webp";
 import avatar03 from "../assets/image 3.webp";
@@ -42,10 +41,6 @@ const scribbleImages = Array.from(
   {length: 12},
   (_, index) => `${import.meta.env.BASE_URL}decorations/crayon-scribble-${String(index + 1).padStart(2, "0")}.webp`,
 );
-
-const decorationArt = {
-  corner: scribbleImages[5],
-};
 
 const stickerSlots = [
   { x: 14, y: 22, size: 116, rotate: -13 },
@@ -134,7 +129,6 @@ function Sticker({ sticker, index, look, reduceMotion }) {
 export default function JennieExperience({
   customAvatars,
   title = "Jennie",
-  cornerText = "made for Jennie",
   bgmUrl = `${import.meta.env.BASE_URL}jenniebgm.mp3`,
   videoUrl,
   onExit,
@@ -472,10 +466,6 @@ export default function JennieExperience({
 
         </section>
 
-        {appearance.decorations ? <div className="corner-note" aria-hidden="true">
-          <img src={decorationArt.corner} alt="" />
-          <span>{cornerText}</span>
-        </div> : null}
         {videoUrl || actionContent ? (
           <div className="experience-actions" aria-label="互动页操作">
             {videoUrl ? (
@@ -484,7 +474,6 @@ export default function JennieExperience({
               </a>
             ) : null}
             {actionContent}
-            {!embedded ? <UISoundToggle className="experience-sfx" /> : null}
           </div>
         ) : null}
       </main>

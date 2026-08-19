@@ -76,6 +76,7 @@ const actionText = {
   photo_selected: "选择照片",
   photo_remove: "移除照片",
   generation_prepare: "准备生成",
+  donation_model: "切换生成模型",
   donation_method: "切换打赏方式",
   donation_continue: "确认并继续生成",
   example_open: "打开案例",
@@ -215,7 +216,7 @@ function JobCard({job, onOpen}) {
             <h3>{job.title}</h3>
             <span className={`admin-status is-${job.status}`}>{statusText[job.status] || job.status}</span>
           </div>
-          <p>{dateTime(job.createdAt)}<span>{job.demo ? "案例" : job.model || "未记录模型"}</span></p>
+          <p>{dateTime(job.createdAt)}<span>{job.demo ? "案例" : job.modelLabel || job.model || "未记录模型"}</span></p>
           <div className="admin-job-data">
             <span><strong>{metrics.visits || 0}</strong>访问</span>
             <span><strong>{metrics.uniqueSessions || 0}</strong>会话</span>
@@ -299,12 +300,12 @@ function JobDetail({job, detail, loading, onClose}) {
               <div><dt>状态</dt><dd>{statusText[current.status] || current.status}</dd></div>
               <div><dt>创建时间</dt><dd>{dateOnly(current.createdAt)} {dateTime(current.createdAt).slice(-5)}</dd></div>
               <div><dt>生成耗时</dt><dd>{current.generationSeconds === null ? "-" : duration(current.generationSeconds)}</dd></div>
-              <div><dt>模型</dt><dd>{current.model || "-"}</dd></div>
+              <div><dt>模型</dt><dd>{current.modelLabel || current.model || "-"}</dd></div>
               <div><dt>成图尺寸</dt><dd>{current.generatedImageSize || "-"}</dd></div>
               <div><dt>Seedream 请求号</dt><dd>{current.seedreamRequestId || "-"}</dd></div>
               <div><dt>估算成本</dt><dd>{current.seedreamCostEstimate ? `¥${Number(current.seedreamCostEstimate.estimatedTotalCny).toFixed(2)}` : "-"}</dd></div>
               <div><dt>订单</dt><dd>{current.order?.id || current.orderId || "-"}</dd></div>
-              <div><dt>支付/打赏</dt><dd>{current.order ? `${current.order.channel} / ¥${current.order.amountCny}` : current.payment?.status || "-"}</dd></div>
+              <div><dt>支付/打赏</dt><dd>{current.order?.provider === "voluntary_tip" ? `自愿打赏 / 建议 ¥${current.order.suggestedDonationCny || current.suggestedDonationCny || "-"}` : current.order ? `${current.order.channel} / ¥${current.order.amountCny}` : current.payment?.status || "-"}</dd></div>
             </dl>
             {current.generationError ? <div className="admin-generation-error"><strong>失败详情</strong><p>{current.generationError}</p></div> : null}
             {current.sheetUrl ? <div className="admin-sheet"><h4>待处理九宫格母图</h4><img src={current.sheetUrl} alt={`${current.title} 九宫格母图`} /></div> : null}

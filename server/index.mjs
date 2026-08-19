@@ -9,6 +9,12 @@ import sharp from "sharp";
 import {createAdminAuth} from "./admin.mjs";
 import {createAnalyticsStore, summarizeEvents} from "./analytics.mjs";
 import {getImageTheme} from "./background.mjs";
+import {
+  defaultImageModelKey,
+  findImageModel,
+  publicImageModelOptions,
+  resolveImageModel,
+} from "./image-models.mjs";
 import {buildAvatarManifest, runGenerationPipeline} from "./pipeline.mjs";
 import {
   PAYMENT_AMOUNT_CNY,
@@ -106,6 +112,26 @@ const demoProfiles = [
   },
 ];
 const patternStyles = new Set(["auto", "dots", "checks", "petals", "confetti", "none"]);
+const VISITOR_COOKIE = "tiny_moods_visitor";
+const visitorCookieValue = (request) => {
+  const header = request.get("cookie") || "";
+  const item = header.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${VISITOR_COOKIE}=`));
+  const value = item ? decodeURIComponent(item.slice(VISITOR_COOKIE.length + 1)) : "";
+  return /^[a-zA-Z0-9_-]{24,80}$/.test(value) ? value : "";
+};
+const ensureVisitor = (request, response) => {
+  const existing = visitorCookieValue(request);
+  if (existing) return existing;
+  const visitorId = crypto.randomBytes(24).toString("base64url");
+  response.cookie(VISITOR_COOKIE, visitorId, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 365 * 24 * 60 * 60 * 1000,
+    path: "/",
+  });
+  return visitorId;
+};
 
 const normalizeAppearance = (value = {}) => ({
   backgroundMode: value.backgroundMode === "white" ? "white" : "color",
@@ -118,6 +144,7 @@ const publicJob = (job) => {
   const {
     internalError: _internalError,
     accessTokenHash: _accessTokenHash,
+    visitorId: _visitorId,
     videoUrl: _videoUrl,
     renderError: _renderError,
     ...safe
@@ -137,9 +164,24 @@ const publicJob = (job) => {
   return safe;
 };
 
+const ownsJob = (request, job) => Boolean(job?.visitorId && visitorCookieValue(request) === job.visitorId);
+const publicJobForRequest = (job, request) => ({...publicJob(job), owned: ownsJob(request, job)});
+const historyJob = (job) => ({
+  id: job.id,
+  title: job.title,
+  status: job.status,
+  stage: job.stage,
+  progress: job.progress,
+  pageUrl: job.status === "ready" && job.pageUrl ? job.pageUrl : `/?job=${job.id}`,
+  previewUrl: job.avatars?.[0]?.src || null,
+  createdAt: job.createdAt,
+  updatedAt: job.updatedAt,
+  completedAt: job.completedAt || null,
+});
+
 const publicOrder = (order) => {
   if (!order) return null;
-  const {accessTokenHash: _accessTokenHash, providerOrderId: _providerOrderId, ...safe} = order;
+  const {accessTokenHash: _accessTokenHash, providerOrderId: _providerOrderId, visitorId: _visitorId, ...safe} = order;
   return safe;
 };
 
@@ -174,6 +216,11 @@ const adminJob = (job, request, analyticsMetrics = {}) => {
       channel: order.channel,
       provider: order.provider,
       amountCny: order.amountCny,
+      suggestedDonationCny: order.suggestedDonationCny,
+      modelTier: order.modelTier,
+      model: order.model,
+      modelLabel: order.modelLabel,
+      generatedImageSize: order.generatedImageSize,
       createdAt: order.createdAt,
       paidAt: order.paidAt,
       consumedAt: order.consumedAt,
@@ -428,7 +475,7 @@ app.get("/api/admin/dashboard", requireAdmin, async (request, response) => {
   const filteredJobs = eligibleJobs.filter((job) => {
     if (status !== "all" && job.status !== status) return false;
     if (!query) return true;
-    return [job.id, job.orderId, job.title, job.model, job.status].some((value) => String(value || "").toLowerCase().includes(query));
+    return [job.id, job.orderId, job.title, job.modelTier, job.modelLabel, job.model, job.status].some((value) => String(value || "").toLowerCase().includes(query));
   });
   const offset = (page - 1) * pageSize;
   const pagedJobs = filteredJobs.slice(offset, offset + pageSize).map((job) => adminJob(job, request, analyticsSummary.perJob[job.id] || {}));
@@ -493,14 +540,17 @@ app.get("/api/admin/jobs/:id/sheet", requireAdmin, async (request, response) => 
 
 app.get("/api/health", (_request, response) => {
   const payment = getPaymentStatus();
+  const defaultModel = resolveImageModel(defaultImageModelKey());
   response.setHeader("Cache-Control", "no-store");
   response.json({
     ok: true,
     configured: Boolean(process.env.ARK_API_KEY) || process.env.GENERATOR_DEMO_MODE === "1",
     demoMode: process.env.GENERATOR_DEMO_MODE === "1",
-    model: process.env.SEEDREAM_MODEL || "doubao-seedream-5-0-pro-260628",
-    priceCny: "0.60",
-    suggestedDonationCny: "0.60",
+    model: defaultModel.model,
+    priceCny: defaultModel.priceCny,
+    suggestedDonationCny: defaultModel.priceCny,
+    defaultImageModel: defaultModel.key,
+    imageModels: publicImageModelOptions(),
     legacyPaidPriceCny: PAYMENT_AMOUNT_CNY,
     payment,
     donationMode: true,
@@ -512,6 +562,31 @@ app.get("/api/health", (_request, response) => {
   });
 });
 
+app.get("/api/history", (request, response) => {
+  const visitorId = ensureVisitor(request, response);
+  const items = [...jobs.values()]
+    .filter((job) => !job.demo && job.visitorId === visitorId)
+    .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))
+    .map(historyJob);
+  response.setHeader("Cache-Control", "private, no-store");
+  response.json({items});
+});
+
+app.get("/api/works/search", (request, response) => {
+  const name = String(request.query.name || "").normalize("NFKC").trim().slice(0, 20);
+  if (!name) return response.status(400).json({error: "请输入完整名字"});
+  const ip = request.ip || "unknown";
+  if (!rateAllowed(`work-search:${ip}`, 120)) return response.status(429).json({error: "查询太频繁，请稍后再试"});
+  const normalizedName = name.toLocaleLowerCase("zh-CN");
+  const items = [...jobs.values()]
+    .filter((job) => !job.demo && job.status === "ready" && String(job.title || "").normalize("NFKC").trim().toLocaleLowerCase("zh-CN") === normalizedName)
+    .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))
+    .slice(0, 20)
+    .map(historyJob);
+  response.setHeader("Cache-Control", "no-store");
+  response.json({items});
+});
+
 app.post("/api/orders/donation", async (request, response) => {
   const ip = request.ip || "unknown";
   if (!rateAllowed(`donation:${ip}`, maxOrdersPerHour)) return response.status(429).json({error: "生成请求过于频繁，请稍后再试"});
@@ -520,13 +595,22 @@ app.post("/api/orders/donation", async (request, response) => {
   const accessToken = crypto.randomBytes(24).toString("base64url");
   const now = new Date();
   const title = String(request.body.title || "我的").replace(/[<>/\\]/g, "").trim().slice(0, 20) || "我的";
+  const requestedModelKey = String(request.body.model || defaultImageModelKey());
+  const selectedModel = findImageModel(requestedModelKey);
+  if (!selectedModel) return response.status(400).json({error: "请选择可用的生成模型"});
   const order = {
     id,
     title,
     channel: "donation",
     provider: "voluntary_tip",
     amountCny: "0.00",
+    suggestedDonationCny: selectedModel.priceCny,
+    modelTier: selectedModel.key,
+    model: selectedModel.model,
+    modelLabel: selectedModel.label,
+    generatedImageSize: selectedModel.size,
     status: "paid",
+    visitorId: ensureVisitor(request, response),
     accessTokenHash: hashAccessToken(accessToken),
     createdAt: now.toISOString(),
     updatedAt: now.toISOString(),
@@ -556,6 +640,7 @@ app.post("/api/orders", async (request, response) => {
     provider: payment.provider,
     amountCny: PAYMENT_AMOUNT_CNY,
     status: "pending",
+    visitorId: ensureVisitor(request, response),
     accessTokenHash: hashAccessToken(accessToken),
     createdAt: now.toISOString(),
     updatedAt: now.toISOString(),
@@ -622,30 +707,46 @@ app.post("/api/jobs", photoUpload.single("photo"), async (request, response) => 
   const id = crypto.randomUUID().replaceAll("-", "");
   const now = Date.now();
   const createdAt = new Date(now).toISOString();
+  const fallbackModel = resolveImageModel(order.modelTier);
+  const selectedModel = {
+    ...fallbackModel,
+    key: order.modelTier || fallbackModel.key,
+    label: order.modelLabel || fallbackModel.label,
+    model: order.model || fallbackModel.model,
+    size: order.generatedImageSize || fallbackModel.size,
+    priceCny: order.suggestedDonationCny || fallbackModel.priceCny,
+  };
   const job = {
     id,
     orderId: order.id,
+    visitorId: order.visitorId || ensureVisitor(request, response),
     title: order.title,
     status: "queued",
     stage: "正在排队",
     progress: 2,
+    resumeUrl: `/?job=${id}`,
     appearance: defaultAppearance,
     accessTokenHash: order.accessTokenHash,
     payment: {
       status: order.provider === "voluntary_tip" ? "donation_optional" : "paid",
       amountCny: order.amountCny || PAYMENT_AMOUNT_CNY,
+      suggestedDonationCny: selectedModel.priceCny,
       channel: order.channel,
     },
     renderCount: 0,
     createdAt,
     updatedAt: createdAt,
     expiresAt: new Date(now + retentionMs).toISOString(),
-    model: process.env.SEEDREAM_MODEL || "doubao-seedream-5-0-pro-260628",
+    modelTier: selectedModel.key,
+    model: selectedModel.model,
+    modelLabel: selectedModel.label,
+    generatedImageSize: selectedModel.size,
+    suggestedDonationCny: selectedModel.priceCny,
   };
   jobs.set(id, job);
   await persistJob(job);
   await updateOrder(order.id, {jobId: id, consumedAt: createdAt});
-  response.status(202).json({...publicJob(job), accessToken});
+  response.status(202).json({...publicJobForRequest(job, request), accessToken});
 
   const publicOrigin = publicOriginFor(request);
   enqueueWork(async () => {
@@ -673,19 +774,19 @@ app.get("/api/jobs/:id", (request, response) => {
   const job = jobs.get(request.params.id);
   if (!job) return response.status(404).json({error: "没有找到这个生成任务"});
   response.setHeader("Cache-Control", "no-store");
-  response.json(publicJob(job));
+  response.json(publicJobForRequest(job, request));
 });
 
 app.get("/api/jobs/:id/sheet", (request, response) => {
   const job = jobs.get(request.params.id);
-  if (!job || !verifyAccessToken(accessTokenFrom(request), job.accessTokenHash)) return response.status(404).end();
+  if (!job || (!ownsJob(request, job) && !verifyAccessToken(accessTokenFrom(request), job.accessTokenHash))) return response.status(404).end();
   response.setHeader("Cache-Control", "private, no-store");
   response.sendFile(path.join(generatedRoot, job.id, "sheet.jpg"));
 });
 
 app.post("/api/jobs/:id/faces", faceUpload.array("faces", 9), async (request, response) => {
   const job = jobs.get(request.params.id);
-  if (!job || !verifyAccessToken(accessTokenFrom(request), job.accessTokenHash)) return response.status(404).json({error: "没有找到这个任务"});
+  if (!job || (!ownsJob(request, job) && !verifyAccessToken(accessTokenFrom(request), job.accessTokenHash))) return response.status(404).json({error: "没有找到这个任务"});
   if (job.avatars?.length === 9) return response.json(publicJob(job));
   if (job.status !== "awaiting_client_processing") return response.status(409).json({error: "任务暂时不能接收抠图结果"});
   if (request.files?.length !== 9) return response.status(400).json({error: "需要上传九张透明 PNG"});

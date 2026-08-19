@@ -3,7 +3,7 @@
 | 俗称 | 学名 | 代码名 |
 | --- | --- | --- |
 | 首页 / 落地页 | 生成器入口 | `Landing` / `.generator-page` |
-| 首页大标题 / 随机文案 | 11 句随机 Typer 波浪主标题，点击换一句；空间不足时从逗号后换行并隐藏行尾逗号 | `landingHeadlines` / `headline` / `showNextHeadline` / `TyperHeadline` / `wrapped` / `.typer-headline-button` / `.typer-flow` / `.typer-phrase` / `.typer-comma` |
+| 首页大标题 / 随机文案 | 11 句随机 Typer 波浪主标题，点击换一句；空间不足时从逗号后换行并隐藏行尾逗号；整体下移 10px | `landingHeadlines` / `headline` / `showNextHeadline` / `TyperHeadline` / `wrapped` / `.landing-heading` / `.typer-headline-button` / `.typer-flow` / `.typer-phrase` / `.typer-comma` |
 | 黑色鼠标 / 放大指针 | 桌面端 37px 自定义实心指针，按下位移 2px | `EmotionCursorTrail` / `.emotion-cursor` |
 | Tiny Moods Logo / 九格拍立得 Logo | 品牌按钮和相机图标 | `BrandButton` / `app-icon.webp` |
 | 随机相机图标 / 点一下换相机 | 导航左侧保留的 9 个扁平透明相机；进入随机，点击品牌切换且不连续重复 | `CameraIcon` / `cameraIconConcepts` / `createCameraIconVariant` / `createInitialCameraIconVariant` / `tiny-moods:camera-icon` / `.camera-icon-*` |
@@ -15,26 +15,35 @@
 | 下边四个头 | 上传区下方的动态案例 | `ExamplePortrait` / `exampleProfiles` / `.example-gallery` |
 | 首页乱画 | 蜡笔涂鸦 | `.hero-doodle` / `crayonDoodles` |
 | 上传照片 | 点击或拖拽单图入口 | `acceptDroppedFiles` / `.photo-dropzone` |
-| 拖入框 / 上传栏 | 单图拖拽上传区 | `.photo-dropzone` / `.photo-workbench` |
-| 对象名字 / 谁的名字 | 选图后展开的名称输入 | `subjectName` / `.subject-name-field` |
+| 拖入框 / 上传栏 | 收短后的单图拖拽上传区，首页不使用上下分割线 | `.photo-dropzone` / `.photo-workbench` / `.landing-theme .generator-nav` / `.example-section` |
+| 对象名字 / 谁的名字 | 选图后展开的名称输入，说明位于输入框上方 | `subjectName` / `.subject-name-field` / `.subject-name-copy` |
+| 右上角生成记录 / 我的作品 | 当前浏览器通过匿名 Cookie 关联的任务记录入口 | `WorkHistoryDialog` / `.history-trigger` / `/api/history` / `tiny_moods_visitor` |
+| 左下角作者主页 / 作者链接 | 页面底部左侧通往 Mikey 个人主页的小字外链 | `.landing-footer` / `author_home_open` / `https://mikeywa.icu` |
+| 正在生成的记录 / 等待本地完成 | 可从固定任务页继续轮询、拆图和抠图的未完成作品 | `?job=:id` / `resumeUrl` / `owned` / `useLocalMatting` |
+| 按名字找作品 / 搜作品 | 使用生成时完整名字精确查询已完成作品 | `.work-search-form` / `/api/works/search?name=` |
+| 确认生成和移除按钮 / 上传后操作栏 | 与名字输入框同排、同高、底边对齐的操作组 | `.photo-details` / `.photo-detail-actions` / `.generate-button` / `.remove-photo` |
 | 首页案例 | 上传区下方无框、微浮动的透明角色列 | `.example-gallery` / `.example-card` / `.example-card-portrait` |
 | 案例浮窗 | 桌面 3:4 预览浮窗、手机底部半弹窗 | `ExamplePreviewDialog` / `embedded` |
 | 日系相册 / C 方案 | 首页固定的明亮轻日系视觉 | `.landing-theme` |
 | 打赏弹窗 | 免费生成前说明层 | `DonationDialog` |
-| ¥0.6 / 打赏金额 | 打赏主标题 | `#donation-title` |
-| 我已打赏，继续生成 | 打赏完成后的生成入口 | `.donation-continue` / `continueAfterDonation` |
+| 选模型 / Pro 和 Lite | 打赏层中的生成模型单选组 | `fallbackDonationModels` / `.donation-models` / `selectedModelKey` / `image-models.mjs` |
+| ¥0.60 / ¥0.22 / 打赏金额 | 随模型切换的建议打赏金额 | `.donation-model-price` / `.donation-amount` / `suggestedDonationCny` |
+| 价格下面的小字 / 感谢文案 | 建议打赏金额下方的支持感谢语 | `.donation-support-copy` / `Calligraph` |
+| ¥1 ~ ¥3 | 固定的自愿打赏建议区间 | `.donation-amount` |
+| 复制作者微信 | 问题与建议联系入口 | `.donation-contact-copy` / `copyText("yanghaoleng")` |
+| 我已打赏，用某模型生成 | 带当前模型的生成入口 | `.donation-continue` / `continueAfterDonation` |
 | 已打赏继续 | 免费生成凭证入口 | `continueAfterDonation` / `/api/orders/donation` |
 | 九宫格提示词 | 纯头部、无缝三等分规则 | `expressionPrompt` |
 | 只要头 | 头顶到下巴，禁止身体 | `expressionPrompt` 的纯头部约束 |
-| 九宫格白线 / 裁剪缝 | 裁切内缩 | `CELL_INSET_RATIO=0` |
+| 九宫格白线 / 裁剪缝 | 每格四边内缩 0.6% | `CELL_INSET_RATIO=0.006` |
 | 在用户电脑上拆图 | 浏览器拆格与抠白底 | `localMatting.js` / `matting.worker.js` |
-| 制作进度页 | 图片生成状态 | `JobStatus` |
+| 制作进度页 / 请不要关闭 | 图片生成和失败状态；成功后直接离开 | `JobStatus` / `completedJob` |
 | 互动页 | 永久作品体验 | `SharedJobExperience` / `JennieExperience` |
 | 底部三个分享按钮 / 放在外面的按钮 | 复制链接、保存图片、分享二维码三个直接入口 | `actionContent` / `.experience-share-action` / `link_copy` / `faces_open` / `qr_open` |
 | 保存图片半弹窗 | 从页面底部打开的九图保存层 | `SaveImagesSheet` / `.share-sheet` / `sheetOpen` |
 | 保存 9 张透明图片 / 九图入口 | 打开透明图平铺保存页 | `.experience-share-action` / `setSheetOpen(true)` |
 | 九图平铺 / 九张列表 | 3×3 透明原图网格 | `.share-face-grid` / `.share-face-item` |
-| 一键保存 9 张 | 手机系统多图保存，电脑 ZIP 单文件下载 | `saveAllFaces` / `prepareAvatarFiles` / `downloadFilesAsZip` / `.share-save-all` |
+| 一键保存 9 张 / 下载压缩包 | 位于九图列表底部；手机系统多图保存，电脑零压缩 ZIP 下载 | `saveAllFaces` / `prepareAvatarFiles` / `downloadFilesAsZip` / `zipSync` / `.share-save-all` |
 | 背景开关 | 互动页顶部的彩色/纯白切换 | `.experience-display-controls` / `backgroundMode` / `patternStyle` |
 | 装饰开关 | 互动页顶部的贴纸显示切换 | `.experience-display-controls` / `decorations` / `stickerSlots` |
 | 主页图标 / 小房子 | 互动页左上角返回主页入口 | `.experience-top-actions` / `.experience-home` / `House` / `onExit` |
@@ -45,7 +54,7 @@
 | 再次下载视频 | Blob 下载兜底按钮 | `triggerDownload` |
 | 访客再生成视频 | 分享访客本机反复渲染 | `LocalVideoRenderPage`，不调用服务端渲染接口 |
 | 永久链接 | 作品或 DEMO 地址 | `?view=:id` / `?demo=:id` |
-| 分享二维码 / 表情二维码 | 中间带该作品表情、支持长按保存的 1080×1080 永久链接码 | `QrShareBubble` / `buildQrCodeDataUrl` / `.qr-share-bubble` / `.qr-bubble-image` |
+| 分享二维码 / 表情二维码 | 小圆点、少量深彩点、圆形定位点与圆角方形头像底板的 1080×1080 永久链接码 | `QrShareBubble` / `buildQrCodeDataUrl` / `drawFinder` / `.qr-share-bubble` / `.qr-bubble-image` |
 | 视频测试提示 | 保存视频按钮下的速度说明 | `.share-video-section > p` |
 | 团子示例 | 团子九表情互动页 | `?demo=tuanzi` / `tuanziAvatars` |
 | Jennie 示例 | 由永久作品 `cec29c58067e4bdc9b6c197b540e7b74` 同步的互动页 | `?demo=jennie` / `featuredJennieAvatars` |
@@ -61,7 +70,9 @@
 | 全部图片压缩 | 静态 PNG 批量转 WebP | `npm run images:optimize` / `scripts/optimize-static-images.mjs` |
 | 图片长缓存 / 打开更快 | 指纹静态资源和作品 WebP 的一年不可变缓存 | `/assets` / `express.static(..., {maxAge: "1y", immutable: true})` / `/generated/:id/face-XX.webp` |
 | 按钮音效 / 电影感音效 | UI SFX `10 Cinematic` 语义音效层 | `uiSfx` / `playUISfx` / `data-uisfx` |
-| 声音开关 / 静音按钮 | 全站界面音效开关 | `UISoundToggle` / `.ui-sfx-toggle` / `9face:ui-sfx` |
+| 左上角声音开关 / 静音按钮 | 互动页唯一声音开关，控制背景音乐 | `.experience-bgm-toggle` / `musicEnabled` / `audioPlaying` |
+| 界面音效开关 | 首页、生成页等非互动页的界面音效开关 | `UISoundToggle` / `.ui-sfx-toggle` / `9face:ui-sfx` |
+| 右下角 Made for | 已删除的互动页归属角标 | 原 `.corner-note` / 原 `cornerText` |
 | 大黑鼠标 / 情绪词轨迹 | 桌面自定义指针与无重叠彩色情绪标签拖尾 | `EmotionCursorTrail` / `.emotion-cursor` / `.emotion-trail-badge` |
 | 生成中的低音 | 本机渲染持续反馈 | `processingSound` / `processing` |
 | 渲染 Loader | 随机蜡笔替换动画 | `LoadingDoodle` |

@@ -1,6 +1,7 @@
 import {mkdir} from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
+import {resolveImageModel} from "./image-models.mjs";
 
 export const fallbackPalette = [
   {accent: "#e85d87", deep: "#7d2948", bg: "#ffd8e5"},
@@ -22,20 +23,22 @@ export const expressionPrompt = `严格保持参考照片中同一个主体的�
 
 九种状态依次为：开心张嘴、惊喜睁大眼、俏皮眨眼、委屈垂眼、酷酷墨镜、可爱嘟嘴或嘟喙、生气鼓脸或炸毛、害羞微笑、戴无线头戴式耳机听歌。耳机不得出现连接线。不要文字，不要水印，不要额外道具遮住面部。整体可爱、精致、真实，适合作为透明背景的纯头部贴纸素材。`;
 
-const estimateSeedreamCost = (usage, size) => {
-  const [width, height] = size.split("x").map(Number);
+const estimateSeedreamCost = (usage, selectedModel) => {
+  const [width, height] = selectedModel.size.split("x").map(Number);
   const pixels = Number.isFinite(width * height) ? width * height : 0;
   const inputImages = Number(usage?.input_images || 1);
   const generatedImages = Number(usage?.generated_images || 1);
-  const billableInputImages = Math.max(0, inputImages - 1);
-  const outputImageRateCny = pixels > 2_610_000 ? 0.6 : 0.3;
-  const totalCny = billableInputImages * 0.02 + generatedImages * outputImageRateCny;
+  const isPro = selectedModel.key === "pro";
+  const billableInputImages = isPro ? Math.max(0, inputImages - 1) : 0;
+  const inputImageRateCny = isPro ? 0.02 : 0;
+  const outputImageRateCny = Number(selectedModel.priceCny);
+  const totalCny = billableInputImages * inputImageRateCny + generatedImages * outputImageRateCny;
   return {
     currency: "CNY",
-    pricingBasis: "火山方舟 Seedream 5.0 Pro 按量刊例价",
-    pixelTier: pixels > 2_610_000 ? "输出图>261万像素" : "输出图≤261万像素",
-    inputImageRateCny: 0.02,
-    freeInputImages: 1,
+    pricingBasis: `火山方舟 ${selectedModel.label} 按量估算`,
+    pixelTier: isPro ? (pixels > 2_610_000 ? "输出图>261万像素" : "输出图≤261万像素") : "按输出图片张数",
+    inputImageRateCny,
+    freeInputImages: isPro ? 1 : 0,
     billableInputImages,
     outputImageRateCny,
     generatedImages,
@@ -43,7 +46,7 @@ const estimateSeedreamCost = (usage, size) => {
   };
 };
 
-export const getSeedreamBuffer = async (sourceBuffer) => {
+export const getSeedreamBuffer = async (sourceBuffer, selectedModel) => {
   const apiKey = process.env.ARK_API_KEY;
   if (!apiKey) throw new Error("服务尚未配置 ARK_API_KEY");
   const normalizedInput = await sharp(sourceBuffer)
@@ -52,10 +55,10 @@ export const getSeedreamBuffer = async (sourceBuffer) => {
     .jpeg({quality: 92})
     .toBuffer();
   const body = {
-    model: process.env.SEEDREAM_MODEL || "doubao-seedream-5-0-pro-260628",
+    model: selectedModel.model,
     prompt: expressionPrompt,
     image: [`data:image/jpeg;base64,${normalizedInput.toString("base64")}`],
-    size: process.env.SEEDREAM_SIZE || "2144x2144",
+    size: selectedModel.size,
     response_format: "url",
     watermark: false,
   };
@@ -112,6 +115,15 @@ async function makeDemoSheet(sourceBuffer, jobDirectory) {
 
 export async function runGenerationPipeline({job, sourceBuffer, projectRoot, generatedRoot, publicOrigin, update}) {
   const jobDirectory = path.join(generatedRoot, job.id);
+  const fallbackModel = resolveImageModel(job.modelTier);
+  const selectedModel = {
+    ...fallbackModel,
+    key: job.modelTier || fallbackModel.key,
+    label: job.modelLabel || fallbackModel.label,
+    model: job.model || fallbackModel.model,
+    size: job.generatedImageSize || fallbackModel.size,
+    priceCny: job.suggestedDonationCny || fallbackModel.priceCny,
+  };
   await mkdir(jobDirectory, {recursive: true});
 
   if (process.env.GENERATOR_DEMO_MODE === "1") {
@@ -126,14 +138,14 @@ export async function runGenerationPipeline({job, sourceBuffer, projectRoot, gen
     return;
   }
 
-  await update({status: "generating", stage: "Seedream 正在生成 4K 九宫格", progress: 12});
-  const seedreamResult = await getSeedreamBuffer(sourceBuffer);
+  await update({status: "generating", stage: `${selectedModel.label} 正在生成九宫格`, progress: 12});
+  const seedreamResult = await getSeedreamBuffer(sourceBuffer, selectedModel);
   await sharp(seedreamResult.buffer)
     .rotate()
     .flatten({background: "#ffffff"})
     .jpeg({quality: 94, chromaSubsampling: "4:4:4"})
     .toFile(path.join(jobDirectory, "sheet.jpg"));
-  const generatedImageSize = process.env.SEEDREAM_SIZE || "2144x2144";
+  const generatedImageSize = selectedModel.size;
   await update({
     status: "awaiting_client_processing",
     stage: "正在浏览器里拆图和抠背景",
@@ -143,6 +155,6 @@ export async function runGenerationPipeline({job, sourceBuffer, projectRoot, gen
     seedreamRequestId: seedreamResult.requestId,
     generatedImageCount: 1,
     generatedImageSize,
-    seedreamCostEstimate: estimateSeedreamCost(seedreamResult.usage, generatedImageSize),
+    seedreamCostEstimate: estimateSeedreamCost(seedreamResult.usage, selectedModel),
   });
 }

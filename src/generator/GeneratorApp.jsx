@@ -1,9 +1,13 @@
 import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from "react";
 import {AnimatePresence, motion, useReducedMotion} from "motion/react";
+import {Calligraph} from "calligraph";
 import {ArrowRight} from "@phosphor-icons/react/ArrowRight";
+import {ArrowSquareOut} from "@phosphor-icons/react/ArrowSquareOut";
 import {Check} from "@phosphor-icons/react/Check";
 import {DownloadSimple} from "@phosphor-icons/react/DownloadSimple";
 import {ImagesSquare} from "@phosphor-icons/react/ImagesSquare";
+import {ClockCounterClockwise} from "@phosphor-icons/react/ClockCounterClockwise";
+import {MagnifyingGlass} from "@phosphor-icons/react/MagnifyingGlass";
 import {PlayCircle} from "@phosphor-icons/react/PlayCircle";
 import {CopySimple} from "@phosphor-icons/react/CopySimple";
 import {QrCode} from "@phosphor-icons/react/QrCode";
@@ -22,6 +26,22 @@ const API_BASE = `${import.meta.env.BASE_URL}api`;
 const MAX_FILE_SIZE = 12 * 1024 * 1024;
 const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 const defaultAppearance = {backgroundMode: "color", patternStyle: "dots", decorations: true};
+const fallbackDonationModels = [
+  {key: "pro", label: "Seedream 5.0 Pro", description: "更高画质与复杂指令表现", size: "2144x2144", priceCny: "0.60"},
+  {key: "lite", label: "Seedream 5.0 Lite", description: "日常生成，成本更低", size: "2144x2144", priceCny: "0.22"},
+];
+const donationThanksCopies = [
+  "谢谢有品位的您！",
+  "感谢您的慷慨支持！",
+  "懂得支持创作的您真酷！",
+  "谢谢您为喜欢买单！",
+  "您的支持特别珍贵！",
+  "感谢您支持好创意！",
+  "愿意支持的您很有爱！",
+  "谢谢您的认可与善意！",
+  "您的支持让创意继续！",
+  "谢谢特别温暖的您！",
+];
 const exampleFaceUrl = (folder, index) => `${import.meta.env.BASE_URL}examples/${folder}/face-${String(index + 1).padStart(2, "0")}.webp`;
 const blueTheme = {accent: "#3ea3e0", deep: "#1b5679", bg: "#d4eaf7"};
 const peachTheme = {accent: "#c88055", deep: "#6a422a", bg: "#f3e2d8"};
@@ -141,10 +161,10 @@ const yangshiTuotuoAvatars = Array.from({length: 9}, (_, index) => ({
 }));
 
 const exampleProfiles = [
-  {id: "jennie", name: "Jennie", avatars: featuredJennieAvatars, brand: "JENNIE 9", cornerText: "made for Jennie", lookCount: 9},
-  {id: "tuanzi", name: "团子", avatars: tuanziAvatars, brand: "团子 9", cornerText: "made for 团子", lookCount: 9},
-  {id: "sun-conure", name: "耙耙柑", avatars: sunConureAvatars, brand: "耙耙柑 9", cornerText: "made for 耙耙柑", lookCount: 9},
-  {id: "yangshi-tuotuo", name: "羊石坨坨", avatars: yangshiTuotuoAvatars, brand: "羊石坨坨 9", cornerText: "made for 羊石坨坨", lookCount: 9},
+  {id: "jennie", name: "Jennie", avatars: featuredJennieAvatars, brand: "JENNIE 9", lookCount: 9},
+  {id: "tuanzi", name: "团子", avatars: tuanziAvatars, brand: "团子 9", lookCount: 9},
+  {id: "sun-conure", name: "耙耙柑", avatars: sunConureAvatars, brand: "耙耙柑 9", lookCount: 9},
+  {id: "yangshi-tuotuo", name: "羊石坨坨", avatars: yangshiTuotuoAvatars, brand: "羊石坨坨 9", lookCount: 9},
 ];
 
 const demoJobForProfile = (profile) => ({
@@ -266,13 +286,14 @@ function useLocalMatting(job, accessToken, setJob) {
   const [retry, setRetry] = useState(0);
 
   useEffect(() => {
-    if (job?.status !== "awaiting_client_processing" || !accessToken || running.current) return undefined;
+    if (job?.status !== "awaiting_client_processing" || (!accessToken && !job?.owned) || running.current) return undefined;
     let active = true;
     running.current = true;
     const run = async () => {
       try {
         setLocal({active: true, progress: 51, stage: "正在下载九宫格母图", error: ""});
-        const response = await fetch(job.sheetUrl, {headers: {"x-access-token": accessToken}, cache: "no-store"});
+        const authHeaders = accessToken ? {"x-access-token": accessToken} : {};
+        const response = await fetch(job.sheetUrl, {headers: authHeaders, cache: "no-store"});
         if (!response.ok) throw new Error("九宫格母图读取失败");
         const blobs = await splitAndMatteSheet(await response.blob(), (done, total) => {
           if (active) setLocal({active: true, progress: 51 + Math.round(done / total * 10), stage: `本地抠图 ${done} / ${total}`, error: ""});
@@ -283,7 +304,7 @@ function useLocalMatting(job, accessToken, setJob) {
         blobs.forEach((blob, index) => body.append("faces", blob, `face-${String(index + 1).padStart(2, "0")}.png`));
         const upload = await fetch(`${API_BASE}/jobs/${job.id}/faces`, {
           method: "POST",
-          headers: {"x-access-token": accessToken},
+          headers: authHeaders,
           body,
         });
         const payload = await upload.json();
@@ -304,7 +325,7 @@ function useLocalMatting(job, accessToken, setJob) {
     };
     void run();
     return () => { active = false; };
-  }, [accessToken, job?.id, job?.sheetUrl, job?.status, retry, setJob]);
+  }, [accessToken, job?.id, job?.owned, job?.sheetUrl, job?.status, retry, setJob]);
 
   return {...local, retry: () => setRetry((value) => value + 1)};
 }
@@ -634,39 +655,108 @@ const loadImageElement = (src) => new Promise((resolve, reject) => {
   image.src = src;
 });
 
+const QR_SIZE = 1080;
+const QR_MARGIN_MODULES = 4;
+const QR_INK = "#1d1b1e";
+const QR_PAPER = "#fbfbfa";
+const QR_ACCENTS = ["#c74362", "#326cae", "#6753b5", "#287c70", "#b95a36"];
+
+const drawRoundedRect = (context, x, y, width, height, radius) => {
+  const safeRadius = Math.min(radius, width / 2, height / 2);
+  context.beginPath();
+  context.moveTo(x + safeRadius, y);
+  context.lineTo(x + width - safeRadius, y);
+  context.quadraticCurveTo(x + width, y, x + width, y + safeRadius);
+  context.lineTo(x + width, y + height - safeRadius);
+  context.quadraticCurveTo(x + width, y + height, x + width - safeRadius, y + height);
+  context.lineTo(x + safeRadius, y + height);
+  context.quadraticCurveTo(x, y + height, x, y + height - safeRadius);
+  context.lineTo(x, y + safeRadius);
+  context.quadraticCurveTo(x, y, x + safeRadius, y);
+  context.closePath();
+};
+
+const qrSeed = (value) => [...value].reduce(
+  (seed, character) => ((seed * 31) + character.codePointAt(0)) >>> 0,
+  2166136261,
+);
+
+const isFinderArea = (row, column, moduleCount) => (
+  (row < 8 && column < 8)
+  || (row < 8 && column >= moduleCount - 8)
+  || (row >= moduleCount - 8 && column < 8)
+);
+
+const drawFinder = (context, offset, moduleSize, originRow, originColumn) => {
+  const centerX = offset + (originColumn + 3.5) * moduleSize;
+  const centerY = offset + (originRow + 3.5) * moduleSize;
+  [
+    {radius: moduleSize * 3.5, color: QR_INK},
+    {radius: moduleSize * 2.45, color: QR_PAPER},
+    {radius: moduleSize * 1.45, color: QR_INK},
+  ].forEach(({radius, color}) => {
+    context.fillStyle = color;
+    context.beginPath();
+    context.arc(centerX, centerY, radius, 0, Math.PI * 2);
+    context.fill();
+  });
+};
+
 async function buildQrCodeDataUrl(shareUrl, avatarUrl) {
   const {default: QRCode} = await import("qrcode");
-  const qrDataUrl = await QRCode.toDataURL(shareUrl, {
-    errorCorrectionLevel: "H",
-    width: 1080,
-    margin: 4,
-    color: {dark: "#1d1b1eff", light: "#fbfbfaff"},
-  });
-  if (!avatarUrl) return qrDataUrl;
+  const qrCode = QRCode.create(shareUrl, {errorCorrectionLevel: "H"});
+  const moduleCount = qrCode.modules.size;
+  const moduleSize = QR_SIZE / (moduleCount + QR_MARGIN_MODULES * 2);
+  const offset = QR_MARGIN_MODULES * moduleSize;
+  const seed = qrSeed(shareUrl);
+  const canvas = document.createElement("canvas");
+  canvas.width = QR_SIZE;
+  canvas.height = QR_SIZE;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("二维码画布创建失败");
+
+  context.fillStyle = QR_PAPER;
+  context.fillRect(0, 0, QR_SIZE, QR_SIZE);
+  for (let row = 0; row < moduleCount; row += 1) {
+    for (let column = 0; column < moduleCount; column += 1) {
+      if (!qrCode.modules.data[row * moduleCount + column] || isFinderArea(row, column, moduleCount)) continue;
+      const accentKey = (row * 43 + column * 29 + seed) % 61;
+      context.fillStyle = accentKey < QR_ACCENTS.length ? QR_ACCENTS[accentKey] : QR_INK;
+      context.beginPath();
+      context.arc(
+        offset + (column + 0.5) * moduleSize,
+        offset + (row + 0.5) * moduleSize,
+        moduleSize * 0.44,
+        0,
+        Math.PI * 2,
+      );
+      context.fill();
+    }
+  }
+
+  drawFinder(context, offset, moduleSize, 0, 0);
+  drawFinder(context, offset, moduleSize, 0, moduleCount - 7);
+  drawFinder(context, offset, moduleSize, moduleCount - 7, 0);
+
+  if (!avatarUrl) return canvas.toDataURL("image/png");
 
   try {
     const response = await fetch(avatarUrl);
-    if (!response.ok) return qrDataUrl;
+    if (!response.ok) return canvas.toDataURL("image/png");
     const avatarObjectUrl = URL.createObjectURL(await response.blob());
     try {
-      const [qrImage, avatarImage] = await Promise.all([
-        loadImageElement(qrDataUrl),
-        loadImageElement(avatarObjectUrl),
-      ]);
-      const size = 1080;
-      const center = size / 2;
-      const bubbleRadius = 126;
-      const avatarSize = 208;
-      const canvas = document.createElement("canvas");
-      canvas.width = size;
-      canvas.height = size;
-      const context = canvas.getContext("2d");
-      if (!context) return qrDataUrl;
-      context.drawImage(qrImage, 0, 0, size, size);
-      context.fillStyle = "#fbfbfa";
-      context.beginPath();
-      context.arc(center, center, bubbleRadius, 0, Math.PI * 2);
+      const avatarImage = await loadImageElement(avatarObjectUrl);
+      const center = QR_SIZE / 2;
+      const tileSize = Math.min(220, moduleSize * 8.8);
+      const tileX = center - tileSize / 2;
+      const tileY = center - tileSize / 2;
+      drawRoundedRect(context, tileX, tileY, tileSize, tileSize, tileSize * 0.18);
+      context.fillStyle = "#fffaf7";
       context.fill();
+      context.lineWidth = Math.max(4, moduleSize * 0.2);
+      context.strokeStyle = QR_INK;
+      context.stroke();
+      const avatarSize = tileSize * 0.76;
       const ratio = Math.min(avatarSize / avatarImage.naturalWidth, avatarSize / avatarImage.naturalHeight);
       const width = avatarImage.naturalWidth * ratio;
       const height = avatarImage.naturalHeight * ratio;
@@ -676,7 +766,7 @@ async function buildQrCodeDataUrl(shareUrl, avatarUrl) {
       URL.revokeObjectURL(avatarObjectUrl);
     }
   } catch {
-    return qrDataUrl;
+    return canvas.toDataURL("image/png");
   }
 }
 
@@ -717,24 +807,31 @@ const imageExtension = (src, mimeType = "") => {
   }
 };
 
-const prepareAvatarFiles = async (avatars, title) => Promise.all(avatars.map(async (avatar, index) => {
-  const source = avatar.downloadSrc || avatar.src;
-  const response = await fetch(source);
-  if (!response.ok) throw new Error(`第 ${index + 1} 张图片读取失败`);
-  const blob = await response.blob();
-  const extension = imageExtension(source, blob.type);
-  return new File([blob], `${safeFilenamePart(title)}-透明表情-${String(index + 1).padStart(2, "0")}.${extension}`, {type: blob.type || `image/${extension}`});
-}));
-
-const downloadFilesAsZip = async (files, title) => {
-  const {zip} = await import("fflate");
-  const entries = {};
-  await Promise.all(files.map(async (file) => {
-    entries[file.name] = new Uint8Array(await file.arrayBuffer());
+const prepareAvatarFiles = async (avatars, title, onProgress = () => {}) => {
+  let completed = 0;
+  return Promise.all(avatars.map(async (avatar, index) => {
+    const source = avatar.downloadSrc || avatar.src;
+    const response = await fetch(source);
+    if (!response.ok) throw new Error(`第 ${index + 1} 张图片读取失败`);
+    const mimeType = response.headers.get("content-type") || "image/png";
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    const extension = imageExtension(source, mimeType);
+    const file = new File(
+      [bytes],
+      `${safeFilenamePart(title)}-透明表情-${String(index + 1).padStart(2, "0")}.${extension}`,
+      {type: mimeType || `image/${extension}`},
+    );
+    completed += 1;
+    onProgress(completed, avatars.length);
+    return {file, bytes};
   }));
-  const archive = await new Promise((resolve, reject) => {
-    zip(entries, {level: 0}, (zipError, data) => zipError ? reject(zipError) : resolve(data));
-  });
+};
+
+const downloadFilesAsZip = async (assets, title) => {
+  const {zipSync} = await import("fflate");
+  const entries = Object.fromEntries(assets.map(({file, bytes}) => [file.name, bytes]));
+  await new Promise((resolve) => window.requestAnimationFrame(resolve));
+  const archive = zipSync(entries, {level: 0});
   const objectUrl = URL.createObjectURL(new Blob([archive], {type: "application/zip"}));
   const link = document.createElement("a");
   link.href = objectUrl;
@@ -742,12 +839,13 @@ const downloadFilesAsZip = async (files, title) => {
   document.body.appendChild(link);
   link.click();
   link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1500);
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
 };
 
 function SaveImagesSheet({job, appearance, onClose, onRender}) {
   const reduceMotion = useReducedMotion();
-  const [preparedFiles, setPreparedFiles] = useState([]);
+  const [preparedAssets, setPreparedAssets] = useState([]);
+  const preparedFiles = useMemo(() => preparedAssets.map(({file}) => file), [preparedAssets]);
   const [saveAllState, setSaveAllState] = useState("");
   const [savingAll, setSavingAll] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -755,13 +853,15 @@ function SaveImagesSheet({job, appearance, onClose, onRender}) {
   const saveAllTimer = useRef(null);
 
   useEffect(() => {
-    if (preparedFiles.length === job.avatars.length) return undefined;
+    if (preparedAssets.length === job.avatars.length) return undefined;
     let active = true;
-    setSaveAllState("正在准备 9 张图片");
-    void prepareAvatarFiles(job.avatars, job.title)
-      .then((files) => {
+    setSaveAllState("正在准备原图 0 / 9");
+    void prepareAvatarFiles(job.avatars, job.title, (done, total) => {
+      if (active) setSaveAllState(`正在准备原图 ${done} / ${total}`);
+    })
+      .then((assets) => {
         if (!active) return;
-        setPreparedFiles(files);
+        setPreparedAssets(assets);
         setSaveAllState("");
       })
       .catch((requestError) => {
@@ -770,7 +870,7 @@ function SaveImagesSheet({job, appearance, onClose, onRender}) {
         setError(requestError.message);
       });
     return () => { active = false; };
-  }, [job.avatars, job.title, preparedFiles.length]);
+  }, [job.avatars, job.title, preparedAssets.length]);
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -796,7 +896,7 @@ function SaveImagesSheet({job, appearance, onClose, onRender}) {
   };
 
   const saveAllFaces = async () => {
-    if (savingAll || preparedFiles.length !== job.avatars.length) return;
+    if (savingAll || preparedAssets.length !== job.avatars.length) return;
     setSavingAll(true);
     setError("");
     try {
@@ -807,7 +907,7 @@ function SaveImagesSheet({job, appearance, onClose, onRender}) {
         setSaveAllState("已打开系统保存");
       } else {
         setSaveAllState("正在打包 9 张图片");
-        await downloadFilesAsZip(preparedFiles, job.title);
+        await downloadFilesAsZip(preparedAssets, job.title);
         setSaveAllState("已开始下载 ZIP");
       }
       trackEvent("interaction", {action: "faces_save_completed", method: useSystemSave ? "system_share" : "zip"}, {jobId: job.id});
@@ -842,8 +942,6 @@ function SaveImagesSheet({job, appearance, onClose, onRender}) {
             <h2 id="share-faces-title">保存九张图片</h2>
             <p>点按看原图，也可以长按每张图片保存</p>
           </div>
-          <button type="button" className="share-action-button share-action-primary share-save-all" onClick={saveAllFaces} disabled={savingAll || preparedFiles.length !== job.avatars.length} data-uisfx={preparedFiles.length === job.avatars.length ? "start" : "blocked"} data-analytics-action="faces_save_all"><DownloadSimple weight="bold" />{saveAllState || "一键保存 9 张"}</button>
-          <p className="share-save-all-note">手机会打开系统保存，电脑会下载含 9 张原图的 ZIP</p>
           <div className="share-face-grid" role="list" aria-label="九张透明表情">
             {job.avatars.map((avatar, index) => (
               <a key={avatar.src} className="share-face-item" href={avatar.downloadSrc || avatar.src} target="_blank" rel="noreferrer" role="listitem" aria-label={`查看第 ${index + 1} 张大图`} data-uisfx="open" data-analytics-action="face_open" data-analytics-target={String(index + 1)}>
@@ -852,6 +950,8 @@ function SaveImagesSheet({job, appearance, onClose, onRender}) {
               </a>
             ))}
           </div>
+          <button type="button" className="share-action-button share-action-primary share-save-all" onClick={saveAllFaces} disabled={savingAll || preparedAssets.length !== job.avatars.length} data-uisfx={preparedAssets.length === job.avatars.length ? "start" : "blocked"} data-analytics-action="faces_save_all"><DownloadSimple weight="bold" />{saveAllState || "一键保存 9 张"}</button>
+          <p className="share-save-all-note">手机会打开系统保存，电脑会下载含 9 张原图的 ZIP</p>
           {error ? <p className="share-sheet-error">{error}</p> : null}
           <div className="share-video-section">
             <button type="button" className="share-save-video" onClick={saveVideo} data-uisfx="start" data-analytics-action="video_generate" disabled={submitting}><DownloadSimple weight="bold" />{submitting ? "正在打开视频生成" : "保存视频"}</button>
@@ -910,9 +1010,8 @@ function QrShareBubble({job, onClose}) {
   );
 }
 
-function JobStatus({job, statusError, local, backLabel = "制作新作品", onBack, onOpenPage}) {
+function JobStatus({job, statusError, local, backLabel = "制作新作品", onBack}) {
   const progress = Math.max(0, Math.min(100, local.error ? local.progress : local.active ? local.progress : job?.progress || 0));
-  const ready = job?.status === "ready";
   const failed = job?.status === "failed";
   const stage = local.error || local.stage || job?.stage || "正在读取任务";
 
@@ -926,26 +1025,20 @@ function JobStatus({job, statusError, local, backLabel = "制作新作品", onBa
         </div>
       </nav>
       <section className="job-panel" aria-live="polite">
-        <div className={`job-orb ${failed || local.error ? "is-failed" : ready ? "is-ready" : "is-loading"}`} aria-hidden="true">
-          {failed || local.error ? <X weight="bold" /> : ready ? <Check weight="bold" /> : <LoadingDoodle />}
+        <div className={`job-orb ${failed || local.error ? "is-failed" : "is-loading"}`} aria-hidden="true">
+          {failed || local.error ? <X weight="bold" /> : <LoadingDoodle />}
         </div>
-        <p className="job-kicker">{ready ? "制作完成" : failed || local.error ? "需要处理" : "正在制作"}</p>
+        <p className="job-kicker">{failed || local.error ? "需要处理" : "请不要关闭本页面"}</p>
         <h1>{stage}</h1>
         <p className="job-description">
-          {ready ? "九张透明表情和互动页已经准备好。打开互动页后，可在当前浏览器里生成并保存视频。" : failed ? job?.error || statusError || "请稍后重试。" : local.error ? "本地拆图没有成功，原始母图仍安全保留，可以直接重试。" : "九宫格拆图和抠背景都在当前浏览器中完成。"}
+          {failed ? job?.error || statusError || "请稍后重试。" : local.error ? "本地拆图没有成功，原始母图仍安全保留，可以直接重试。" : "九宫格拆图和抠背景都在当前浏览器中完成。"}
         </p>
         {!failed ? <div className="job-progress" aria-label={`当前进度 ${progress}%`}><div className="job-progress-fill" style={{transform: `scaleX(${progress / 100})`}} /></div> : null}
         {job?.avatars?.length ? (
           <div className="job-faces" aria-label="已经生成的表情预览">{job.avatars.map((avatar, index) => <img key={avatar.src} src={avatar.src} alt={`${job.title} 表情 ${index + 1}`} />)}</div>
         ) : <div className="job-skeletons" aria-hidden="true">{Array.from({length: 9}, (_, index) => <span key={index} />)}</div>}
         {local.error ? <button type="button" className="button-primary" onClick={local.retry} data-uisfx="retry" data-analytics-action="client_processing_retry">重试本地拆图</button> : null}
-        {ready ? (
-          <div className="job-actions">
-            <button type="button" className="button-primary" onClick={onOpenPage} data-uisfx="forward" data-analytics-action="experience_open">打开互动页 <ArrowRight weight="bold" /></button>
-          </div>
-        ) : null}
         {failed ? <button type="button" className="button-primary" onClick={onBack} data-uisfx="back">换一张照片</button> : null}
-        <p className="retention-note"><ShieldCheck weight="fill" /> 互动页永久保留，视频可在本机反复生成</p>
       </section>
     </main>
   );
@@ -1077,7 +1170,6 @@ function SharedJobExperience({job, onExit, onRender, embedded = false}) {
       <JennieExperience
         customAvatars={job.avatars}
         title={job.title}
-        cornerText={`made for ${job.title}`}
         appearance={appearance}
         onAppearanceChange={setAppearance}
         lookCount={9}
@@ -1173,9 +1265,15 @@ function ExamplePreviewDialog({profile, onClose, onRender}) {
   );
 }
 
-function DonationDialog({busy, error, onClose, onContinue}) {
+function DonationDialog({busy, error, models = fallbackDonationModels, defaultModel = "pro", onClose, onContinue}) {
   const reduceMotion = useReducedMotion();
   const [method, setMethod] = useState("wechat");
+  const [wechatCopied, setWechatCopied] = useState(false);
+  const [supportCopy] = useState(() => `生成图片会产生费用，不需要给太多。${donationThanksCopies[Math.floor(Math.random() * donationThanksCopies.length)]}`);
+  const [selectedModelKey, setSelectedModelKey] = useState(() => (
+    models.some((model) => model.key === defaultModel) ? defaultModel : models[0]?.key || "pro"
+  ));
+  const selectedModel = models.find((model) => model.key === selectedModelKey) || models[0] || fallbackDonationModels[0];
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -1192,8 +1290,33 @@ function DonationDialog({busy, error, onClose, onContinue}) {
     <motion.div className="donation-backdrop" initial={reduceMotion ? false : {opacity: 0}} animate={{opacity: 1}} exit={{opacity: 0}} onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}>
       <motion.section className="donation-dialog" initial={reduceMotion ? false : {opacity: 0, y: 24, scale: 0.97}} animate={{opacity: 1, y: 0, scale: 1}} exit={reduceMotion ? {opacity: 0} : {opacity: 0, y: 12}} role="dialog" aria-modal="true" aria-labelledby="donation-title">
         <button type="button" className="donation-close" onClick={onClose} data-uisfx="close" data-analytics-action="donation_close" aria-label="关闭打赏说明"><X weight="bold" /></button>
-        <h2 id="donation-title">¥0.6</h2>
-        <p className="donation-copy">这是每次生成的成本，请随意打赏，维持运营，谢谢支持！</p>
+        <h2 id="donation-title">选择生成模型</h2>
+        <p className="donation-copy">不同模型对应不同生成成本，按需要选择即可。</p>
+        <div className="donation-models" role="radiogroup" aria-label="选择生成模型">
+          {models.map((model) => (
+            <button
+              type="button"
+              role="radio"
+              aria-checked={selectedModel.key === model.key}
+              className={selectedModel.key === model.key ? "is-selected" : ""}
+              onClick={() => setSelectedModelKey(model.key)}
+              data-uisfx="select"
+              data-analytics-action="donation_model"
+              data-analytics-target={model.key}
+              key={model.key}
+            >
+              <span className="donation-model-copy"><strong>{model.label}</strong><small>{model.description}</small></span>
+              <span className="donation-model-price">¥{model.priceCny}</span>
+            </button>
+          ))}
+        </div>
+        <div className="donation-amount">
+          <span>建议打赏</span>
+          <strong>¥1 ~ ¥3</strong>
+        </div>
+        <p className="donation-copy donation-support-copy">
+          {reduceMotion ? supportCopy : <Calligraph initial animation="smooth" drift={{x: 0, y: 10}} trend={1} stagger={0.012}>{supportCopy}</Calligraph>}
+        </p>
         <div className="donation-tabs" role="tablist" aria-label="选择打赏方式">
           <button type="button" role="tab" aria-selected={method === "wechat"} className={method === "wechat" ? "is-selected wechat" : "wechat"} onClick={() => setMethod("wechat")} data-uisfx="select" data-analytics-action="donation_method" data-analytics-target="wechat"><WechatLogo weight="fill" />微信</button>
           <button type="button" role="tab" aria-selected={method === "alipay"} className={method === "alipay" ? "is-selected alipay" : "alipay"} onClick={() => setMethod("alipay")} data-uisfx="select" data-analytics-action="donation_method" data-analytics-target="alipay"><span aria-hidden="true">支</span>支付宝</button>
@@ -1201,14 +1324,137 @@ function DonationDialog({busy, error, onClose, onContinue}) {
         <div className="donation-qr-frame" role="tabpanel">
           <img src={`${import.meta.env.BASE_URL}donate/${method}-qr.webp`} alt={`${method === "wechat" ? "微信" : "支付宝"}打赏二维码`} />
         </div>
+        <p className="donation-contact-copy">有问题或建议请联系作者：<button type="button" onClick={async () => { await copyText("yanghaoleng"); setWechatCopied(true); }} data-uisfx="copy" data-analytics-action="author_wechat_copy">{wechatCopied ? "已复制 yanghaoleng" : "复制微信号（yanghaoleng）"}</button></p>
         {error ? <p className="donation-error">{error}</p> : null}
-        <button type="button" className="button-primary donation-continue" onClick={onContinue} data-uisfx="start" data-analytics-action="donation_continue" disabled={busy}>{busy ? "正在开始生成" : "我已打赏，继续生成"}<ArrowRight weight="bold" /></button>
+        <button type="button" className="button-primary donation-continue" onClick={() => onContinue(selectedModel.key)} data-uisfx="start" data-analytics-action="donation_continue" data-analytics-target={selectedModel.key} disabled={busy}>{busy ? "正在开始生成" : `我已打赏，用 ${selectedModel.label.replace("Seedream ", "")} 生成`}<ArrowRight weight="bold" /></button>
       </motion.section>
     </motion.div>
   );
 }
 
-function Landing({resumeOrderId, onRenderExample, onJobCreated}) {
+const workStatusCopy = (work) => {
+  if (work.status === "ready") return "已完成";
+  if (work.status === "failed") return "生成失败";
+  return work.stage || "正在生成";
+};
+
+const workTimeCopy = (value) => new Intl.DateTimeFormat("zh-CN", {
+  month: "numeric",
+  day: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+}).format(new Date(value));
+
+function WorkHistoryDialog({onClose, onOpenWork}) {
+  const reduceMotion = useReducedMotion();
+  const searchInputRef = useRef(null);
+  const [history, setHistory] = useState([]);
+  const [historyState, setHistoryState] = useState("loading");
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState([]);
+  const [searchState, setSearchState] = useState("idle");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const onKeyDown = (event) => { if (event.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  useEffect(() => {
+    let active = true;
+    let timer;
+    const refresh = async () => {
+      try {
+        const response = await fetch(`${API_BASE}/history`, {cache: "no-store"});
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || "生成记录读取失败");
+        if (!active) return;
+        setHistory(payload.items || []);
+        setHistoryState("ready");
+        setError("");
+        if ((payload.items || []).some((item) => !["ready", "failed"].includes(item.status))) {
+          timer = window.setTimeout(refresh, 1800);
+        }
+      } catch (requestError) {
+        if (!active) return;
+        setHistoryState("error");
+        setError(requestError.message);
+      }
+    };
+    void refresh();
+    return () => { active = false; window.clearTimeout(timer); };
+  }, []);
+
+  const searchWorks = async (event) => {
+    event.preventDefault();
+    const name = query.trim();
+    if (!name) {
+      setSearchState("error");
+      setError("请输入作品的完整名字");
+      searchInputRef.current?.focus();
+      return;
+    }
+    setSearchState("loading");
+    setError("");
+    try {
+      const response = await fetch(`${API_BASE}/works/search?name=${encodeURIComponent(name)}`, {cache: "no-store"});
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "查询失败");
+      setResults(payload.items || []);
+      setSearchState("ready");
+      trackEvent("work_name_searched", {found: (payload.items || []).length > 0});
+    } catch (requestError) {
+      setSearchState("error");
+      setError(requestError.message);
+    }
+  };
+
+  const renderWorks = (items, emptyCopy) => items.length ? (
+    <div className="work-history-list">
+      {items.map((work) => (
+        <button key={work.id} type="button" className="work-history-item" onClick={() => onOpenWork(work)} data-uisfx="open">
+          <span className={`work-history-preview ${work.previewUrl ? "has-image" : ""}`}>
+            {work.previewUrl ? <img src={work.previewUrl} alt={`${work.title}作品预览`} /> : <ClockCounterClockwise weight="bold" aria-hidden="true" />}
+          </span>
+          <span className="work-history-copy">
+            <strong>{work.title}</strong>
+            <small>{workTimeCopy(work.createdAt)}</small>
+            <span className={`work-history-status is-${work.status}`}>{workStatusCopy(work)}</span>
+          </span>
+          <ArrowRight weight="bold" aria-hidden="true" />
+        </button>
+      ))}
+    </div>
+  ) : <div className="work-history-empty"><ClockCounterClockwise weight="bold" /><strong>{emptyCopy}</strong></div>;
+
+  return (
+    <motion.div className="work-history-backdrop" initial={reduceMotion ? false : {opacity: 0}} animate={{opacity: 1}} exit={{opacity: 0}} onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      <motion.section className="work-history-dialog" initial={reduceMotion ? false : {opacity: 0, y: 20, scale: 0.98}} animate={{opacity: 1, y: 0, scale: 1}} exit={reduceMotion ? {opacity: 0} : {opacity: 0, y: 10}} role="dialog" aria-modal="true" aria-labelledby="work-history-title">
+        <div className="work-history-header">
+          <div><h2 id="work-history-title">生成记录</h2><p>这个浏览器创建的作品会自动出现在这里。</p></div>
+          <button type="button" className="work-history-close" onClick={onClose} aria-label="关闭生成记录" data-uisfx="close"><X weight="bold" /></button>
+        </div>
+        <div className="work-history-section">
+          <h3>我的作品</h3>
+          {historyState === "loading" ? <div className="work-history-loading" aria-label="正在读取生成记录"><span /><span /><span /></div> : null}
+          {historyState === "ready" ? renderWorks(history, "还没有生成记录") : null}
+        </div>
+        <div className="work-search-section">
+          <div><h3>按名字找作品</h3><p>请输入生成时填写的完整名字。</p></div>
+          <form className="work-search-form" onSubmit={searchWorks}>
+            <label htmlFor="work-name-search">作品名字</label>
+            <div><input ref={searchInputRef} id="work-name-search" value={query} maxLength={20} autoComplete="off" placeholder="例如：团子" onChange={(event) => { setQuery(event.target.value); setSearchState("idle"); setError(""); }} /><button type="submit" disabled={searchState === "loading"}><MagnifyingGlass weight="bold" />{searchState === "loading" ? "查询中" : "查询"}</button></div>
+          </form>
+          {searchState === "ready" ? renderWorks(results, "没有找到同名的已完成作品") : null}
+        </div>
+        {error ? <p className="work-history-error">{error}</p> : null}
+      </motion.section>
+    </motion.div>
+  );
+}
+
+function Landing({resumeOrderId, onRenderExample, onJobCreated, onOpenWork}) {
   const reduceMotion = useReducedMotion();
   const inputRef = useRef(null);
   const nameInputRef = useRef(null);
@@ -1220,6 +1466,7 @@ function Landing({resumeOrderId, onRenderExample, onJobCreated}) {
   const [previewProfileId, setPreviewProfileId] = useState("");
   const [order, setOrder] = useState(null);
   const [donationOpen, setDonationOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [health, setHealth] = useState(null);
@@ -1373,15 +1620,15 @@ function Landing({resumeOrderId, onRenderExample, onJobCreated}) {
     setDonationOpen(true);
   };
 
-  const continueAfterDonation = async () => {
+  const continueAfterDonation = async (selectedModelKey) => {
     setSubmitting(true);
     setError("");
-    trackEvent("generation_started", {titleLength: subjectName.trim().length});
+    trackEvent("generation_started", {titleLength: subjectName.trim().length, model: selectedModelKey});
     try {
       const response = await fetch(`${API_BASE}/orders/donation`, {
         method: "POST",
         headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({title: subjectName.trim()}),
+        body: JSON.stringify({title: subjectName.trim(), model: selectedModelKey}),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "生成凭证创建失败");
@@ -1404,6 +1651,7 @@ function Landing({resumeOrderId, onRenderExample, onJobCreated}) {
       <nav className="generator-nav">
         <BrandButton onClick={() => window.scrollTo({top: 0, behavior: "smooth"})} />
         <div className="landing-nav-tools">
+          <button type="button" className="history-trigger" onClick={() => setHistoryOpen(true)} data-uisfx="open" data-analytics-action="history_open"><ClockCounterClockwise weight="bold" /><span>生成记录</span></button>
           <UISoundToggle />
         </div>
       </nav>
@@ -1444,7 +1692,10 @@ function Landing({resumeOrderId, onRenderExample, onJobCreated}) {
             {file ? (
               <motion.div className="photo-details" initial={reduceMotion ? false : {opacity: 0, y: -10}} animate={{opacity: 1, y: 0}} exit={{opacity: 0, y: -8}} transition={{duration: reduceMotion ? 0 : 0.28}}>
                 <div className="subject-name-field">
-                  <label htmlFor="subject-name">它叫什么名字？</label>
+                  <div className="subject-name-copy">
+                    <label htmlFor="subject-name">它叫什么名字？</label>
+                    <small>这个名字会显示在互动页开头。</small>
+                  </div>
                   <input
                     ref={nameInputRef}
                     id="subject-name"
@@ -1454,7 +1705,6 @@ function Landing({resumeOrderId, onRenderExample, onJobCreated}) {
                     placeholder="例如：团子"
                     onChange={(event) => { setSubjectName(event.target.value); if (error) setError(""); }}
                   />
-                  <small>这个名字会显示在互动页开头。</small>
                 </div>
                 <div className="photo-detail-actions">
                   <button type="button" className="remove-photo" onClick={() => { setFile(null); setSubjectName(""); setError(""); }} data-uisfx="delete" data-analytics-action="photo_remove">移除照片</button>
@@ -1477,8 +1727,16 @@ function Landing({resumeOrderId, onRenderExample, onJobCreated}) {
         </div>
       </motion.section>
 
-      <AnimatePresence>{donationOpen ? <DonationDialog busy={submitting} error={error} onClose={() => { if (!submitting) setDonationOpen(false); }} onContinue={continueAfterDonation} /> : null}</AnimatePresence>
+      <footer className="landing-footer">
+        <a href="https://mikeywa.icu" target="_blank" rel="noreferrer" aria-label="打开作者主页" data-uisfx="open" data-analytics-action="author_home_open">
+          <span>作者主页</span>
+          <ArrowSquareOut weight="bold" aria-hidden="true" />
+        </a>
+      </footer>
+
+      <AnimatePresence>{donationOpen ? <DonationDialog busy={submitting} error={error} models={health?.imageModels?.length ? health.imageModels : fallbackDonationModels} defaultModel={health?.defaultImageModel || "pro"} onClose={() => { if (!submitting) setDonationOpen(false); }} onContinue={continueAfterDonation} /> : null}</AnimatePresence>
       <AnimatePresence>{previewProfile ? <ExamplePreviewDialog profile={previewProfile} onClose={() => setPreviewProfileId("")} onRender={(appearance) => onRenderExample(previewProfile.id, appearance)} /> : null}</AnimatePresence>
+      <AnimatePresence>{historyOpen ? <WorkHistoryDialog onClose={() => setHistoryOpen(false)} onOpenWork={(work) => { setHistoryOpen(false); onOpenWork(work); }} /> : null}</AnimatePresence>
     </main>
   );
 }
@@ -1491,14 +1749,15 @@ export default function GeneratorApp() {
   const accessToken = createdJob?.accessToken || loadToken("job", activeJobId);
   const local = useLocalMatting(job, accessToken, setJob);
   const activeExample = route.demo ? exampleProfiles.find((profile) => profile.id === route.demo) : null;
+  const completedJob = Boolean(activeJobId && job?.id === activeJobId && job.status === "ready" && job.avatars?.length === 9);
   const analyticsContext = useMemo(() => {
     if (activeExample && route.renderProgress) return {page: "demo_video_render", jobId: `demo-${activeExample.id}`, demoId: activeExample.id};
     if (activeExample) return {page: "demo_experience", jobId: `demo-${activeExample.id}`, demoId: activeExample.id};
     if (route.viewId && route.renderProgress) return {page: "job_video_render", jobId: activeJobId || route.viewId, demoId: ""};
-    if (route.viewId) return {page: "job_experience", jobId: activeJobId || route.viewId, demoId: ""};
+    if (route.viewId || completedJob) return {page: "job_experience", jobId: activeJobId || route.viewId, demoId: ""};
     if (activeJobId) return {page: "generation_status", jobId: activeJobId, demoId: ""};
     return {page: route.orderId ? "generation_resume" : "landing", jobId: "", demoId: ""};
-  }, [activeExample, activeJobId, route.orderId, route.renderProgress, route.viewId]);
+  }, [activeExample, activeJobId, completedJob, route.orderId, route.renderProgress, route.viewId]);
   usePageAnalytics(analyticsContext);
 
   useEffect(() => {
@@ -1506,6 +1765,14 @@ export default function GeneratorApp() {
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
+
+  useEffect(() => {
+    if (activeExample || route.viewId || !activeJobId || !completedJob) return;
+    window.history.replaceState({}, "", `${import.meta.env.BASE_URL}?view=${encodeURIComponent(activeJobId)}`);
+    setCreatedJob(null);
+    setRoute(routeFromLocation());
+    window.scrollTo({top: 0});
+  }, [activeExample, activeJobId, completedJob, route.viewId]);
 
   const navigate = (query = "") => {
     window.history.pushState({}, "", `${import.meta.env.BASE_URL}${query}`);
@@ -1515,9 +1782,9 @@ export default function GeneratorApp() {
   };
 
   useEffect(() => {
-    document.title = activeExample ? `${activeExample.name} 示例 | Tiny Moods` : route.viewId ? "我的互动表情 | Tiny Moods" : route.jobId ? "作品工坊 | Tiny Moods" : "Tiny Moods | 一张照片生成九种可爱心情";
-    if (!activeExample && !route.viewId) document.querySelector('meta[name="theme-color"]')?.setAttribute("content", route.jobId ? "#f6f0ed" : "#ffffff");
-  }, [activeExample, route.jobId, route.viewId]);
+    document.title = activeExample ? `${activeExample.name} 示例 | Tiny Moods` : route.viewId || completedJob ? "我的互动表情 | Tiny Moods" : route.jobId ? "作品工坊 | Tiny Moods" : "Tiny Moods | 一张照片生成九种可爱心情";
+    if (!activeExample && !route.viewId && !completedJob) document.querySelector('meta[name="theme-color"]')?.setAttribute("content", route.jobId ? "#f6f0ed" : "#ffffff");
+  }, [activeExample, completedJob, route.jobId, route.viewId]);
 
   if (activeExample && route.renderProgress) {
     return <LocalVideoRenderPage job={demoJobForProfile(activeExample)} appearance={route.renderAppearance} onBack={() => navigate(`?demo=${encodeURIComponent(activeExample.id)}`)} />;
@@ -1528,9 +1795,9 @@ export default function GeneratorApp() {
   if (route.viewId && job?.avatars?.length === 9 && route.renderProgress) {
     return <LocalVideoRenderPage job={job} appearance={route.renderAppearance} onBack={() => navigate(`?view=${encodeURIComponent(job.id)}`)} />;
   }
-  if (route.viewId && job?.avatars?.length === 9) {
+  if ((route.viewId || completedJob) && job?.avatars?.length === 9) {
     return <SharedJobExperience job={job} onExit={() => navigate()} onRender={(appearance) => navigate(renderQuery("view", job.id, appearance))} />;
   }
-  if (activeJobId) return <JobStatus job={job || createdJob} statusError={error} local={local} backLabel={route.viewId ? "返回互动页" : "制作新作品"} onBack={() => route.viewId ? navigate(`?view=${activeJobId}`) : navigate()} onOpenPage={() => navigate(`?view=${activeJobId}`)} />;
-  return <Landing resumeOrderId={route.orderId} onRenderExample={(exampleId, appearance) => navigate(renderQuery("demo", exampleId, appearance))} onJobCreated={(nextJob) => { setCreatedJob(nextJob); window.history.replaceState({}, "", `${import.meta.env.BASE_URL}?job=${nextJob.id}`); setRoute(routeFromLocation()); window.scrollTo({top: 0}); }} />;
+  if (activeJobId) return <JobStatus job={job || createdJob} statusError={error} local={local} backLabel={route.viewId ? "返回互动页" : "制作新作品"} onBack={() => route.viewId ? navigate(`?view=${activeJobId}`) : navigate()} />;
+  return <Landing resumeOrderId={route.orderId} onRenderExample={(exampleId, appearance) => navigate(renderQuery("demo", exampleId, appearance))} onOpenWork={(work) => navigate(work.status === "ready" ? `?view=${encodeURIComponent(work.id)}` : `?job=${encodeURIComponent(work.id)}`)} onJobCreated={(nextJob) => { setCreatedJob(nextJob); window.history.replaceState({}, "", `${import.meta.env.BASE_URL}?job=${nextJob.id}`); setRoute(routeFromLocation()); window.scrollTo({top: 0}); }} />;
 }

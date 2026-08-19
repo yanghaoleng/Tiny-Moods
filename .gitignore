@@ -4,6 +4,7 @@ generated/
 orders/
 data/
 output/
+analytics/
 .env
 .env.*
 !.env.example
