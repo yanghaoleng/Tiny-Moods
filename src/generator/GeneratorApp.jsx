@@ -973,7 +973,10 @@ function QrShareBubble({job, onClose}) {
     let active = true;
     void buildQrCodeDataUrl(shareUrl, avatarUrl)
       .then((value) => { if (active) setQrDataUrl(value); })
-      .catch(() => { if (active) setQrDataUrl(""); });
+      .catch((error) => {
+        console.error("二维码生成失败", error);
+        if (active) setQrDataUrl("");
+      });
     return () => { active = false; };
   }, [avatarUrl, shareUrl]);
 
@@ -1673,7 +1676,6 @@ function Landing({resumeOrderId, onRenderExample, onJobCreated, onOpenWork}) {
         <BrandButton onClick={() => window.scrollTo({top: 0, behavior: "smooth"})} />
         <div className="landing-nav-tools">
           <button type="button" className="history-trigger" onClick={() => setHistoryOpen(true)} data-uisfx="open" data-analytics-action="history_open"><ClockCounterClockwise weight="bold" /><span>生成记录</span></button>
-          <UISoundToggle />
         </div>
       </nav>
 

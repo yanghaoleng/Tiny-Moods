@@ -60,6 +60,7 @@
 
 ## 本轮验收
 
+- [x] 首页静音按钮移除后 `npm run build` 通过，639 个模块完成构建
 - [x] 5 色轮播与作品显示设置持久化改动 `npm run build` 通过，639 个模块完成构建；`server/index.mjs` 语法检查通过
 - [x] 打赏感谢文案与 Calligraph 动效改动 `npm run build` 通过，639 个模块完成构建
 - [x] `npm run images:optimize` 可重复执行；本次目标图片 `5,953,190 → 2,172,348 bytes`，减少 `64%`

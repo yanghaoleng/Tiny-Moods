@@ -71,7 +71,7 @@
 | 图片长缓存 / 打开更快 | 指纹静态资源和作品 WebP 的一年不可变缓存 | `/assets` / `express.static(..., {maxAge: "1y", immutable: true})` / `/generated/:id/face-XX.webp` |
 | 按钮音效 / 电影感音效 | UI SFX `10 Cinematic` 语义音效层 | `uiSfx` / `playUISfx` / `data-uisfx` |
 | 左上角声音开关 / 静音按钮 | 互动页唯一声音开关，控制背景音乐 | `.experience-bgm-toggle` / `musicEnabled` / `audioPlaying` |
-| 界面音效开关 | 首页、生成页等非互动页的界面音效开关 | `UISoundToggle` / `.ui-sfx-toggle` / `9face:ui-sfx` |
+| 界面音效开关 | 生成进度页等非互动页的界面音效开关，首页不显示 | `UISoundToggle` / `.ui-sfx-toggle` / `9face:ui-sfx` |
 | 右下角 Made for | 已删除的互动页归属角标 | 原 `.corner-note` / 原 `cornerText` |
 | 大黑鼠标 / 情绪词轨迹 | 桌面自定义指针与无重叠彩色情绪标签拖尾 | `EmotionCursorTrail` / `.emotion-cursor` / `.emotion-trail-badge` |
 | 生成中的低音 | 本机渲染持续反馈 | `processingSound` / `processing` |
