@@ -30,6 +30,7 @@
 | 打赏弹窗 | 免费生成前说明层 | `DonationDialog` |
 | 微信赞赏码 / 长按打赏图 | 微信原生个人赞赏码，不接 API 且不校验支付 | `public/donate/wechat-appreciation-code.jpg` / `.donation-qr-frame` / `DonationDialog` |
 | 选模型 / Pro 和 Lite / 默认 Lite | 打赏层中的双段 Switch；默认 Lite，提交所选 `model` 键 | `fallbackDonationModels` / `.donation-model-switch` / `selectedModelKey` / `image-models.mjs` |
+| Lite 没权限 / 选 Lite 还失败 | Seedream 5.0 Lite 真实模型调用权限；只尝试 Lite ID，不自动用 Pro 兜底 | `SEEDREAM_LITE_API_KEY` / `SEEDREAM_LITE_MODEL` / `SEEDREAM_LITE_FALLBACK_MODELS` / `candidateImageModelIds` / `imageModelApiKey` |
 | ¥1 ~ ¥3 / 打赏金额 | 无“建议打赏”前缀的固定自愿支持区间 | `.donation-amount` / `suggestedDonationCny` |
 | 价格下面的小字 / 感谢文案 | 建议打赏金额下方的两行支持感谢语，逐字 Typer 入场 | `.donation-support-copy` / `TyperSupportCopy` |
 | ¥1 ~ ¥3 | 固定的自愿打赏建议区间 | `.donation-amount` |

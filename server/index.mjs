@@ -257,6 +257,9 @@ const writeUploadedSource = async (file, directory) => {
 };
 const friendlyGenerationError = (error) => {
   const message = error instanceof Error ? error.message : String(error || "");
+  if (/Lite.*403|尚未开通 Lite|Lite 模型权限/i.test(message)) {
+    return "Seedream 5.0 Lite 暂未开通调用权限，请联系作者处理";
+  }
   if (/Seedream 请求失败（?403|AccessDenied|Forbidden/i.test(message)) {
     return "生成模型暂时没有访问权限，请稍后再试，或联系管理员检查火山方舟模型权限";
   }

@@ -1,7 +1,12 @@
 import {mkdir, writeFile} from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
-import {resolveImageModel} from "./image-models.mjs";
+import {
+  candidateImageModelIds,
+  imageModelApiKey,
+  imageModelEndpoint,
+  resolveImageModel,
+} from "./image-models.mjs";
 
 export const fallbackPalette = [
   {accent: "#e85d87", deep: "#7d2948", bg: "#ffd8e5"},
@@ -47,35 +52,55 @@ const estimateSeedreamCost = (usage, selectedModel) => {
 };
 
 export const getSeedreamBuffer = async (sourceBuffer, selectedModel) => {
-  const apiKey = process.env.ARK_API_KEY;
-  if (!apiKey) throw new Error("服务尚未配置 ARK_API_KEY");
+  const apiKey = imageModelApiKey(selectedModel);
+  if (!apiKey) throw new Error(`服务尚未配置 ${selectedModel.label} 的火山方舟 API Key`);
   const normalizedInput = await sharp(sourceBuffer)
     .rotate()
     .resize({width: 2048, height: 2048, fit: "inside", withoutEnlargement: true})
     .jpeg({quality: 92})
     .toBuffer();
-  const body = {
-    model: selectedModel.model,
-    prompt: expressionPrompt,
-    image: [`data:image/jpeg;base64,${normalizedInput.toString("base64")}`],
-    size: selectedModel.size,
-    response_format: "url",
-    watermark: false,
-  };
-  const response = await fetch(
-    process.env.ARK_IMAGE_ENDPOINT || "https://ark.cn-beijing.volces.com/api/v3/images/generations",
-    {
-      method: "POST",
-      headers: {Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json"},
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(Number(process.env.SEEDREAM_TIMEOUT_MS || 1_200_000)),
-    },
-  );
-  if (!response.ok) throw new Error(`Seedream 请求失败（${response.status}）：${(await response.text()).slice(0, 1200)}`);
+  const image = [`data:image/jpeg;base64,${normalizedInput.toString("base64")}`];
+  const modelIds = candidateImageModelIds(selectedModel);
+  let lastFailure = null;
+  for (const model of modelIds) {
+    const body = {
+      model,
+      prompt: expressionPrompt,
+      image,
+      size: selectedModel.size,
+      response_format: "url",
+      watermark: false,
+    };
+    const response = await fetch(
+      imageModelEndpoint(selectedModel),
+      {
+        method: "POST",
+        headers: {Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json"},
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(Number(process.env.SEEDREAM_TIMEOUT_MS || 1_200_000)),
+      },
+    );
+    const requestId = response.headers.get("x-tt-logid") || response.headers.get("x-request-id") || null;
+    if (!response.ok) {
+      const details = (await response.text()).slice(0, 1200);
+      lastFailure = {status: response.status, details, model, requestId};
+      if (selectedModel.key === "lite" && response.status === 403 && modelIds.length > 1) continue;
+      throw new Error(`Seedream 请求失败（${response.status}）：${details}`);
+    }
+    return await seedreamResponseToBuffer(response, requestId);
+  }
+
+  if (lastFailure?.status === 403 && selectedModel.key === "lite") {
+    throw new Error(`Seedream 5.0 Lite 请求失败（403）：当前火山账号或 API Key 尚未开通 Lite 模型权限；已尝试 ${modelIds.join("、")}，不会自动改用 Pro。原始错误：${lastFailure.details}`);
+  }
+  if (lastFailure) throw new Error(`Seedream 请求失败（${lastFailure.status}）：${lastFailure.details}`);
+  throw new Error("Seedream 请求失败：没有可用的模型 ID");
+};
+
+const seedreamResponseToBuffer = async (response, requestId) => {
   const payload = await response.json();
   const item = payload.data?.[0] || payload.result?.data?.[0] || payload.result;
   const usage = payload.usage || payload.result?.usage || null;
-  const requestId = response.headers.get("x-tt-logid") || response.headers.get("x-request-id") || null;
   if (item?.b64_json) return {buffer: Buffer.from(item.b64_json, "base64"), usage, requestId};
   const imageUrl = item?.url || payload.url || payload.output?.url;
   if (!imageUrl) throw new Error("Seedream 未返回可用图片");
