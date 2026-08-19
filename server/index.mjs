@@ -5,6 +5,7 @@ import {fileURLToPath} from "node:url";
 import dotenv from "dotenv";
 import express from "express";
 import multer from "multer";
+import sharp from "sharp";
 import {createAdminAuth} from "./admin.mjs";
 import {createAnalyticsStore, summarizeEvents} from "./analytics.mjs";
 import {getImageTheme} from "./background.mjs";
@@ -80,6 +81,28 @@ const ensureFacePreview = async (directory, index) => {
   }
   return preview;
 };
+const uploadedSourceExtension = (file) => {
+  if (file.mimetype === "image/png") return "png";
+  if (file.mimetype === "image/webp") return "webp";
+  return "jpg";
+};
+const findUploadedSourceFilename = async (job, directory) => {
+  const candidates = [
+    job.uploadedSourceFilename,
+    "upload-original.jpg",
+    "upload-original.png",
+    "upload-original.webp",
+  ].filter(Boolean);
+  for (const candidate of [...new Set(candidates)]) {
+    try {
+      await stat(path.join(directory, candidate));
+      return candidate;
+    } catch {
+      // Older jobs did not keep the uploaded source image.
+    }
+  }
+  return "";
+};
 const findOriginalSheetFilename = async (job, directory) => {
   const candidates = [
     job.originalSheetFilename,
@@ -146,6 +169,102 @@ const ensureVisitor = (request, response) => {
   return visitorId;
 };
 
+const headerValue = (request, name) => {
+  const value = request.get(name);
+  return value ? String(value).slice(0, 500) : "";
+};
+const parseUserAgent = (userAgent = "") => {
+  const ua = String(userAgent);
+  const wechat = ua.match(/MicroMessenger\/([\d.]+)/i)?.[1] || "";
+  const os = ua.match(/iPhone OS ([\d_]+)/i)
+    ? `iOS ${ua.match(/iPhone OS ([\d_]+)/i)[1].replaceAll("_", ".")}`
+    : ua.match(/iPad.*OS ([\d_]+)/i)
+      ? `iPadOS ${ua.match(/OS ([\d_]+)/i)[1].replaceAll("_", ".")}`
+      : ua.match(/Android\s+([\d.]+)/i)
+        ? `Android ${ua.match(/Android\s+([\d.]+)/i)[1]}`
+        : ua.includes("Mac OS X")
+          ? "macOS"
+          : ua.includes("Windows")
+            ? "Windows"
+            : "";
+  const browser = wechat
+    ? `WeChat ${wechat}`
+    : ua.match(/Edg\/([\d.]+)/)?.[1]
+      ? `Edge ${ua.match(/Edg\/([\d.]+)/)[1]}`
+      : ua.match(/CriOS\/([\d.]+)/)?.[1]
+        ? `Chrome iOS ${ua.match(/CriOS\/([\d.]+)/)[1]}`
+        : ua.match(/Chrome\/([\d.]+)/)?.[1]
+          ? `Chrome ${ua.match(/Chrome\/([\d.]+)/)[1]}`
+          : ua.match(/Version\/([\d.]+).*Safari/i)?.[1]
+            ? `Safari ${ua.match(/Version\/([\d.]+).*Safari/i)[1]}`
+            : "";
+  const device = ua.includes("iPad")
+    ? "iPad"
+    : ua.includes("iPhone")
+      ? "iPhone"
+      : ua.match(/Android[^;]*;\s*([^;)]+)\)/i)?.[1]?.trim() || (ua.includes("Android") ? "Android" : ua.includes("Macintosh") ? "Mac" : ua.includes("Windows") ? "Windows PC" : "");
+  return {device, os, browser, wechatVersion: wechat};
+};
+const requestInfoFrom = (request) => {
+  const userAgent = headerValue(request, "user-agent");
+  const locationHint = {
+    country: headerValue(request, "cf-ipcountry") || headerValue(request, "x-vercel-ip-country"),
+    region: headerValue(request, "x-vercel-ip-country-region"),
+    city: headerValue(request, "x-vercel-ip-city"),
+    timezone: headerValue(request, "x-vercel-ip-timezone"),
+  };
+  return {
+    ip: request.ip || "",
+    ips: request.ips || [],
+    forwardedFor: headerValue(request, "x-forwarded-for"),
+    realIp: headerValue(request, "x-real-ip") || headerValue(request, "cf-connecting-ip") || headerValue(request, "true-client-ip"),
+    protocol: request.protocol,
+    host: headerValue(request, "host"),
+    origin: headerValue(request, "origin"),
+    referer: headerValue(request, "referer"),
+    acceptLanguage: headerValue(request, "accept-language"),
+    userAgent,
+    clientHints: {
+      ua: headerValue(request, "sec-ch-ua"),
+      platform: headerValue(request, "sec-ch-ua-platform"),
+      mobile: headerValue(request, "sec-ch-ua-mobile"),
+      model: headerValue(request, "sec-ch-ua-model"),
+    },
+    locationHint,
+    device: parseUserAgent(userAgent),
+    capturedAt: new Date().toISOString(),
+  };
+};
+const uploadedSourceInfo = async (file) => {
+  const image = await sharp(file.buffer).metadata().catch(() => ({}));
+  return {
+    originalName: path.basename(file.originalname || ""),
+    mimeType: file.mimetype,
+    bytes: file.size,
+    width: image.width || null,
+    height: image.height || null,
+    format: image.format || null,
+    orientation: image.orientation || null,
+    hasProfile: Boolean(image.hasProfile),
+    hasAlpha: Boolean(image.hasAlpha),
+  };
+};
+const writeUploadedSource = async (file, directory) => {
+  const extension = uploadedSourceExtension(file);
+  const filename = `upload-original.${extension}`;
+  await writeFile(path.join(directory, filename), file.buffer, {mode: 0o600});
+  return filename;
+};
+const friendlyGenerationError = (error) => {
+  const message = error instanceof Error ? error.message : String(error || "");
+  if (/Seedream 请求失败（?403|AccessDenied|Forbidden/i.test(message)) {
+    return "生成模型暂时没有访问权限，请稍后再试，或联系管理员检查火山方舟模型权限";
+  }
+  if (/timeout|aborted|超时/i.test(message)) return "生成模型响应超时，请稍后再试";
+  if (/ARK_API_KEY/i.test(message)) return "生成服务密钥尚未配置，请联系管理员";
+  return "生成服务没有完成，请稍后重试";
+};
+
 const normalizeAppearance = (value = {}) => ({
   backgroundMode: value.backgroundMode === "white" ? "white" : "color",
   patternStyle: patternStyles.has(value.patternStyle) ? value.patternStyle : "dots",
@@ -161,6 +280,9 @@ const publicJob = (job) => {
     videoUrl: _videoUrl,
     renderError: _renderError,
     originalSheetFilename: _originalSheetFilename,
+    uploadedSourceFilename: _uploadedSourceFilename,
+    uploadRequest: _uploadRequest,
+    uploadedSource: _uploadedSource,
     ...safe
   } = job;
   safe.videoStatus = "local";
@@ -231,9 +353,12 @@ const adminJob = (job, request, analyticsMetrics = {}) => {
     adminOpenUrl: job.status === "ready" && job.pageUrl
       ? `${origin}${job.pageUrl}`
       : `${origin}/api/admin/jobs/${job.id}/resume`,
+    uploadedSourceUrl: job.uploadedSourceFilename ? `/api/admin/jobs/${job.id}/upload` : null,
     imageUrls: (safe.avatars || []).map((avatar) => `${origin}${avatar.src.startsWith("/") ? "" : "/"}${avatar.src}`),
     generationError: job.internalError || job.error || null,
     generationSeconds: job.completedAt ? Math.max(0, Math.round((Date.parse(job.completedAt) - Date.parse(job.createdAt)) / 1000)) : null,
+    uploadedSource: job.uploadedSource || null,
+    uploadRequest: job.uploadRequest || null,
     order: order ? {
       id: order.id,
       status: order.status,
@@ -314,6 +439,14 @@ const restoreState = async () => {
     try {
       const job = JSON.parse(await readFile(path.join(generatedRoot, entry.name, "job.json"), "utf8"));
       if (job.title === "小太阳") job.title = "耙耙柑";
+      if (job.status === "failed" && job.internalError) {
+        const nextError = friendlyGenerationError(job.internalError);
+        if (job.error !== nextError) {
+          job.error = nextError;
+          job.updatedAt = new Date().toISOString();
+          await persistJob(job);
+        }
+      }
       if (["queued", "generating", "rendering"].includes(job.status)) {
         job.status = job.avatars?.length === 9 ? "ready" : "failed";
         job.stage = job.avatars?.length === 9 ? "素材已保留，视频可在浏览器本机生成" : "任务在服务重启时中断";
@@ -575,6 +708,20 @@ app.get("/api/admin/jobs/:id/events", requireAdmin, async (request, response) =>
   response.json({job: adminJob(job, request, summarizeEvents(events).perJob[job.id] || {}), summary: summarizeEvents(events), events: events.map(publicAdminEvent)});
 });
 
+app.get("/api/admin/jobs/:id/upload", requireAdmin, async (request, response) => {
+  const job = jobs.get(request.params.id);
+  if (!job) return response.status(404).end();
+  const directory = path.join(generatedRoot, job.id);
+  const uploadedSourceFilename = await findUploadedSourceFilename(job, directory);
+  if (!uploadedSourceFilename) return response.status(404).end();
+  const extension = path.extname(uploadedSourceFilename) || ".jpg";
+  const sourceFile = path.join(directory, uploadedSourceFilename);
+  const title = String(job.title || "Tiny Moods").replace(/[<>/\\]/g, "").trim() || "Tiny Moods";
+  response.setHeader("Cache-Control", "private, no-store");
+  if (request.query.download === "1") return response.download(sourceFile, `${title}-用户上传原图${extension}`);
+  return response.sendFile(sourceFile);
+});
+
 app.get("/api/admin/jobs/:id/sheet", requireAdmin, async (request, response) => {
   const job = jobs.get(request.params.id);
   if (!job) return response.status(404).end();
@@ -755,7 +902,7 @@ app.post("/api/payments/xunhu/notify", async (request, response) => {
 });
 
 app.post("/api/jobs", photoUpload.single("photo"), async (request, response) => {
-  if (!request.file) return response.status(400).json({error: "请上传一张清晰的正脸照片"});
+  if (!request.file) return response.status(400).json({error: "请上传一张 JPG、PNG 或 WebP 图片"});
   if (request.body.consent !== "true") return response.status(400).json({error: "请先确认您有权使用这张照片"});
   const order = orders.get(String(request.body.orderId || ""));
   const accessToken = String(request.body.accessToken || "");
@@ -778,6 +925,12 @@ app.post("/api/jobs", photoUpload.single("photo"), async (request, response) => 
     size: order.generatedImageSize || fallbackModel.size,
     priceCny: order.suggestedDonationCny || fallbackModel.priceCny,
   };
+  const directory = path.join(generatedRoot, id);
+  await mkdir(directory, {recursive: true});
+  const [uploadedSourceFilename, uploadedSource] = await Promise.all([
+    writeUploadedSource(request.file, directory),
+    uploadedSourceInfo(request.file),
+  ]);
   const job = {
     id,
     orderId: order.id,
@@ -804,6 +957,9 @@ app.post("/api/jobs", photoUpload.single("photo"), async (request, response) => 
     modelLabel: selectedModel.label,
     generatedImageSize: selectedModel.size,
     suggestedDonationCny: selectedModel.priceCny,
+    uploadedSourceFilename,
+    uploadedSource,
+    uploadRequest: requestInfoFrom(request),
   };
   jobs.set(id, job);
   await persistJob(job);
@@ -825,7 +981,7 @@ app.post("/api/jobs", photoUpload.single("photo"), async (request, response) => 
       await updateJob(id, {
         status: "failed",
         stage: "生成没有完成",
-        error: "生成失败，请稍后重试或更换一张清晰正脸照",
+        error: friendlyGenerationError(error),
         internalError: error instanceof Error ? error.message : String(error),
       });
     }

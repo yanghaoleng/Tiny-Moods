@@ -15,6 +15,8 @@
 | 下边四个头 | 上传区下方的动态案例 | `ExamplePortrait` / `exampleProfiles` / `.example-gallery` |
 | 首页乱画 | 蜡笔涂鸦 | `.hero-doodle` / `crayonDoodles` |
 | 上传照片 | 点击或拖拽单图入口 | `acceptDroppedFiles` / `.photo-dropzone` |
+| 用户上传原图 / 上传源图 | 用户提交的原始 JPG、PNG 或 WebP，仅后台可查看和下载 | `uploadedSourceFilename` / `uploadedSource` / `uploadedSourceUrl` / `/api/admin/jobs/:id/upload` |
+| 上传信息 / IP 设备信息 | 创建任务时无需额外权限即可从请求头读取的 IP、转发 IP、User-Agent、语言、来源页和大致地址线索 | `uploadRequest` / `requestInfoFrom` / `parseUserAgent` / `JobDetail` |
 | 拖入框 / 上传栏 | 收短后的单图拖拽上传区，首页不使用上下分割线 | `.photo-dropzone` / `.photo-workbench` / `.landing-theme .generator-nav` / `.example-section` |
 | 对象名字 / 谁的名字 | 选图后展开的名称输入，说明位于输入框上方 | `subjectName` / `.subject-name-field` / `.subject-name-copy` |
 | 右上角生成记录 / 我的作品 | 当前浏览器通过匿名 Cookie 关联的任务记录入口 | `WorkHistoryDialog` / `.history-trigger` / `/api/history` / `tiny_moods_visitor` |
@@ -84,7 +86,7 @@
 | 后台密码 / 密码键盘 | 无账户名的 6 位管理口令；手机数字键盘、电脑数字键与回车兼容 | `ADMIN_PASSWORD` / `#admin-password` / `inputMode="numeric"` |
 | 后台总览 / 数据大盘 | 生成数量、访问、停留、交互和成本汇总 | `/api/admin/dashboard` / `.admin-overview` |
 | 生成记录 / 作品列表 | 可筛选的九图与永久链接列表 | `JobCard` / `.admin-job-grid` |
-| 生成详情 / 右侧抽屉 | 单次生成参数、九图和埋点时间线 | `JobDetail` / `.admin-detail` |
+| 生成详情 / 右侧抽屉 | 单次生成参数、九图、用户上传原图、上传请求信息和埋点时间线 | `JobDetail` / `.admin-detail` |
 | 埋点 / 数据埋点 | 匿名页面、停留、交互和生成阶段事件 | `trackEvent` / `/api/analytics/events` |
 | 页面停留时间 | 页面处于可见状态的累计时长，15 秒心跳与离开补报 | `usePageAnalytics` / `page_stay` |
 | 页面访问 | 每次进入首页、生成页、互动页或视频页 | `page_view` |

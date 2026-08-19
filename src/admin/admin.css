@@ -1057,6 +1057,25 @@
   font-size: 12px;
 }
 
+.admin-sheet-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.admin-sheet-heading h4 {
+  margin: 0;
+}
+
+.admin-sheet-heading a {
+  color: var(--admin-accent);
+  font-size: 12px;
+  font-weight: 850;
+  text-decoration: none;
+}
+
 .admin-sheet img {
   width: 100%;
   display: block;

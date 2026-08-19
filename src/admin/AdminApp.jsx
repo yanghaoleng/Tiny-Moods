@@ -47,6 +47,13 @@ const duration = (seconds = 0) => {
   return remainder ? `${minutes} 分 ${remainder} 秒` : `${minutes} 分`;
 };
 
+const fileSize = (bytes = 0) => {
+  const value = Number(bytes) || 0;
+  if (value >= 1024 * 1024) return `${(value / 1024 / 1024).toFixed(1)} MB`;
+  if (value >= 1024) return `${Math.round(value / 1024)} KB`;
+  return value ? `${value} B` : "-";
+};
+
 const statusText = {
   ready: "已完成",
   failed: "失败",
@@ -280,6 +287,12 @@ function JobDetail({job, detail, loading, onClose}) {
 
   const metrics = current.analytics || {};
   const linkLabel = current.status === "ready" ? "打开永久链接" : "打开固定任务链接";
+  const uploadedSource = current.uploadedSource || {};
+  const uploadRequest = current.uploadRequest || {};
+  const uploadDevice = uploadRequest.device || {};
+  const uploadLocation = uploadRequest.locationHint || {};
+  const uploadLocationText = [uploadLocation.country, uploadLocation.region, uploadLocation.city, uploadLocation.timezone].filter(Boolean).join(" / ") || "-";
+  const uploadClientText = [uploadDevice.device, uploadDevice.os, uploadDevice.browser].filter(Boolean).join(" / ") || "-";
   return (
     <div className="admin-detail-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <aside className="admin-detail" role="dialog" aria-modal="true" aria-labelledby="admin-detail-title">
@@ -313,6 +326,31 @@ function JobDetail({job, detail, loading, onClose}) {
             </dl>
             {current.generationError ? <div className="admin-generation-error"><strong>失败详情</strong><p>{current.generationError}</p></div> : null}
             {current.sheetUrl ? <div className="admin-sheet"><h4>{current.status === "ready" ? "AI 生成原图" : "待处理九宫格母图"}</h4><img src={current.sheetUrl} alt={`${current.title} 九宫格母图`} /></div> : null}
+          </section>
+
+          <section className="admin-detail-section">
+            <h3>上传信息</h3>
+            <dl className="admin-definition-grid">
+              <div><dt>用户上传原图</dt><dd>{uploadedSource.originalName || (current.uploadedSourceUrl ? "已保存" : "-")}</dd></div>
+              <div><dt>文件信息</dt><dd>{[uploadedSource.mimeType, fileSize(uploadedSource.bytes)].filter(Boolean).join(" / ") || "-"}</dd></div>
+              <div><dt>图片尺寸</dt><dd>{uploadedSource.width && uploadedSource.height ? `${uploadedSource.width}×${uploadedSource.height}` : "-"}</dd></div>
+              <div><dt>图片格式</dt><dd>{[uploadedSource.format, uploadedSource.hasProfile ? "含色彩配置" : "", uploadedSource.hasAlpha ? "透明通道" : ""].filter(Boolean).join(" / ") || "-"}</dd></div>
+              <div><dt>IP</dt><dd>{uploadRequest.ip || "-"}</dd></div>
+              <div><dt>转发 IP</dt><dd>{uploadRequest.forwardedFor || uploadRequest.realIp || "-"}</dd></div>
+              <div><dt>大致地址线索</dt><dd>{uploadLocationText}</dd></div>
+              <div><dt>设备/系统/浏览器</dt><dd>{uploadClientText}</dd></div>
+              <div><dt>语言</dt><dd>{uploadRequest.acceptLanguage || "-"}</dd></div>
+              <div><dt>来源页面</dt><dd>{uploadRequest.referer || uploadRequest.origin || "-"}</dd></div>
+            </dl>
+            {current.uploadedSourceUrl ? (
+              <div className="admin-sheet admin-upload-source">
+                <div className="admin-sheet-heading">
+                  <h4>用户上传原图</h4>
+                  <a href={`${current.uploadedSourceUrl}?download=1`}>下载原图</a>
+                </div>
+                <img src={current.uploadedSourceUrl} alt={`${current.title} 用户上传原图`} />
+              </div>
+            ) : null}
           </section>
 
           <section className="admin-detail-section">

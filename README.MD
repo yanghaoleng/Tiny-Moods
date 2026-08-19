@@ -17,8 +17,8 @@
 - Seedream 生成无缝 3×3 九宫格；每格只允许头顶到下巴，禁止脖子、肩膀、衣服、手和身体
 - 浏览器本地三等分并向每格内缩 `0.6%` 后连通白底抠图，避免把九宫格边界细线带入成图
 - 每个作品生成永久互动链接和带作品表情的分享二维码；二维码气泡支持点开或浏览器长按保存
-- 内部运营后台 `/admin` 可按状态、关键词和时间范围查看全部生成记录、九张成图、永久链接、模型请求号、估算成本、失败详情和关联埋点
-- 前台采集匿名页面访问、可见停留时长、点击与表单状态变化，并把事件关联到具体作品或 DEMO；不采集输入内容、原始 IP、完整 User-Agent 或原照片
+- 内部运营后台 `/admin` 可按状态、关键词和时间范围查看全部生成记录、用户上传原图、九张成图、永久链接、模型请求号、估算成本、失败详情、上传请求信息和关联埋点
+- 前台采集匿名页面访问、可见停留时长、点击与表单状态变化，并把事件关联到具体作品或 DEMO；生成任务会在后台保存用户上传原图、IP/转发 IP、User-Agent、语言、来源页和可从请求头推断的大致设备/地址线索，不额外请求定位或设备权限
 - 互动页底部直接外露复制链接、保存原图和分享二维码；保存原图弹层直接提供火山引擎生成的完整九宫格，并保留本机视频测试入口
 - 互动页左上角使用房子图标返回主页，并提供背景音乐开关；背景与装饰开关位于顶部，悬停不会暂停或覆盖自动换表情
 - 微信内置浏览器打开作品页时不再自动抢播 BGM，封面先显示“播放音乐”按钮，点击后才开始播放并交给左上角音乐开关控制；其他浏览器保留自动播放与首次点击补播
@@ -62,19 +62,19 @@
 ```text
 浏览器选图并本地暂存
   → 用 Lite / Pro 开关选择模型（默认 Lite），创建免费生成凭证
-  → 服务端安全调用 Seedream（密钥不下发）
+  → 服务端保存上传原图和请求线索，安全调用 Seedream（密钥不下发）
   → 浏览器 Web Worker 无缝拆图、抠白底
   → 火山原始九宫格永久保留，浏览器另行输出九张 1080px 透明 WebP 供互动页使用
   → 浏览器按当前样式和 BGM 本机渲染、下载视频
 ```
 
 - 前端：Vite、React、Motion、Calligraph、UI SFX / Web Audio、Canvas 2D、Web Worker、Remotion Web Renderer
-- 服务端：Express、Multer、Sharp，负责模型密钥、任务/订单状态、永久素材、匿名埋点和运营后台；不渲染视频
+- 服务端：Express、Multer、Sharp，负责模型密钥、任务/订单状态、上传原图、永久素材、匿名埋点和运营后台；不渲染视频
 - 模型：火山方舟 Lite `doubao-seedream-5-0-260128`（默认）；Pro `doubao-seedream-5-0-pro-260628`；模型 ID、尺寸和价格均可由服务端环境变量覆盖
 - 视频：1080×1920 布局按 `2/3` 缩放输出为 720×1280、30fps、约 21.27 秒、9 个造型；优先 H.264/AAC MP4
 - 数据：生产 `DATA_ROOT=/var/lib/9face`；作品资源使用同源相对地址，埋点按北京时间写入 `analytics/events/YYYY-MM-DD.jsonl`
 - 匿名身份：Cookie `tiny_moods_visitor` 仅保存随机访客 ID，HttpOnly、SameSite=Lax、有效期一年；照片、名字和作品访问令牌不写入 Cookie
-- 图片：静态位图统一为 WebP，Favicon 为 SVG；每个新作品长期保留火山返回的原始九宫格字节和 9 张互动用 1080px 透明 WebP，不再生成下载 JPG 或 ZIP
+- 图片：静态位图统一为 WebP，Favicon 为 SVG；每个新任务保存用户上传原图，每个新作品长期保留火山返回的原始九宫格字节和 9 张互动用 1080px 透明 WebP，不再生成下载 JPG 或 ZIP
 - 后台安全：不设置账户名，仅使用服务端 `ADMIN_PASSWORD`；登录后使用 12 小时 HttpOnly、SameSite 会话 Cookie，不把管理密码写入前端
 - 兼容：本机视频生成要求支持 WebCodecs 的新版 Chrome、Firefox 或 Safari
 
@@ -87,9 +87,10 @@
 - `GET` / `POST` / `DELETE /api/admin/session`：检查、创建和退出后台会话
 - `GET /api/admin/dashboard`：读取生成记录、九图、永久链接和埋点聚合
 - `GET /api/admin/jobs/:id/events`：读取单次生成的埋点明细
+- `GET /api/admin/jobs/:id/upload`：后台查看或下载用户上传原图；加 `?download=1` 下载原始文件
 - `GET /api/admin/jobs/:id/sheet`：后台查看任务保留的九宫格母图
 - `POST /api/orders/donation`：提交 `title` 和 `model=pro|lite`，服务端校验后创建带模型快照的免费生成凭证
-- `POST /api/jobs`：上传照片并创建任务
+- `POST /api/jobs`：上传照片并创建任务；服务端保存上传原图、文件信息和无需额外权限的请求/设备线索
 - `GET /api/jobs/:id`：读取任务和永久素材
 - `PATCH /api/jobs/:id/appearance`：作品主人保存背景与装饰显示设置
 - `GET /api/jobs/:id/sheet`：凭作品令牌读取九宫格母图
