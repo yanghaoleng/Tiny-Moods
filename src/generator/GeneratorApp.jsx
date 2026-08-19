@@ -1146,9 +1146,30 @@ function SharedJobExperience({job, onExit, onRender, embedded = false}) {
   const [copyState, setCopyState] = useState("");
   const [appearance, setAppearance] = useState(job.appearance || defaultAppearance);
   const copyTimer = useRef(null);
+  const appearanceSaveQueue = useRef(Promise.resolve());
   const shareUrl = useMemo(() => shareUrlForJob(job), [job.id, job.pageUrl]);
   const closeSheet = useCallback(() => setSheetOpen(false), []);
   const closeQr = useCallback(() => setQrOpen(false), []);
+  const updateAppearance = useCallback((updater) => {
+    setAppearance((current) => {
+      const next = typeof updater === "function" ? updater(current) : updater;
+      const accessToken = loadToken("job", job.id);
+      if (!job.demo && (job.owned || accessToken)) {
+        appearanceSaveQueue.current = appearanceSaveQueue.current
+          .catch(() => undefined)
+          .then(async () => {
+            const response = await fetch(`${API_BASE}/jobs/${encodeURIComponent(job.id)}/appearance`, {
+              method: "PATCH",
+              headers: {"Content-Type": "application/json", ...(accessToken ? {"x-access-token": accessToken} : {})},
+              body: JSON.stringify(next),
+            });
+            if (!response.ok) throw new Error("显示设置保存失败");
+          })
+          .catch(() => undefined);
+      }
+      return next;
+    });
+  }, [job.demo, job.id, job.owned]);
 
   useEffect(() => () => window.clearTimeout(copyTimer.current), []);
 
@@ -1171,7 +1192,7 @@ function SharedJobExperience({job, onExit, onRender, embedded = false}) {
         customAvatars={job.avatars}
         title={job.title}
         appearance={appearance}
-        onAppearanceChange={setAppearance}
+        onAppearanceChange={updateAppearance}
         lookCount={9}
         onExit={onExit}
         actionContent={(

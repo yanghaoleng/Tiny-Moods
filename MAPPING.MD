@@ -44,8 +44,8 @@
 | 保存 9 张透明图片 / 九图入口 | 打开透明图平铺保存页 | `.experience-share-action` / `setSheetOpen(true)` |
 | 九图平铺 / 九张列表 | 3×3 透明原图网格 | `.share-face-grid` / `.share-face-item` |
 | 一键保存 9 张 / 下载压缩包 | 位于九图列表底部；手机系统多图保存，电脑零压缩 ZIP 下载 | `saveAllFaces` / `prepareAvatarFiles` / `downloadFilesAsZip` / `zipSync` / `.share-save-all` |
-| 背景开关 | 互动页顶部的彩色/纯白切换 | `.experience-display-controls` / `backgroundMode` / `patternStyle` |
-| 装饰开关 | 互动页顶部的贴纸显示切换 | `.experience-display-controls` / `decorations` / `stickerSlots` |
+| 背景开关 | 互动页顶部的 5 种浅色轮播/纯白切换，作品主人设置持久化 | `.experience-display-controls` / `backgroundMode` / `carouselBackgrounds` / `PATCH /api/jobs/:id/appearance` |
+| 装饰开关 | 互动页顶部的贴纸显示切换，作品主人设置持久化 | `.experience-display-controls` / `decorations` / `stickerSlots` / `PATCH /api/jobs/:id/appearance` |
 | 主页图标 / 小房子 | 互动页左上角返回主页入口 | `.experience-top-actions` / `.experience-home` / `House` / `onExit` |
 | 背景音乐开关 | 互动页左上角的 BGM 播放与暂停 | `.experience-bgm-toggle` / `musicEnabled` / `audioPlaying` / `toggleMusic` |
 | 保存视频 | 保存图片半弹窗底部的本机渲染入口 | `.share-video-section` / `.share-save-video` / `?render=1` |

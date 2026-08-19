@@ -50,6 +50,13 @@ const stickerSlots = [
 
 const THEME_TRANSITION_DURATION = 5625;
 const AUTO_CHANGE_INTERVAL = 6563;
+const carouselBackgrounds = [
+  {bg: "#f8e9ee", accent: "#d98ba5"},
+  {bg: "#eaf4fa", accent: "#78afd0"},
+  {bg: "#edf6ef", accent: "#80b991"},
+  {bg: "#f1edfa", accent: "#a18bc8"},
+  {bg: "#fbf4df", accent: "#d0aa62"},
+];
 function buildStickers(look) {
   const colorfulCount = 1 + (look % 2);
   const colorfulStart = (look * 2) % stickerSlots.length;
@@ -157,7 +164,8 @@ export default function JennieExperience({
 
   const avatarIndex = (look * 7) % avatarSet.length;
   const avatar = avatarSet[avatarIndex];
-  const baseThemeAvatar = avatarSet[(baseThemeLook * 7) % avatarSet.length];
+  const background = carouselBackgrounds[look % carouselBackgrounds.length];
+  const baseBackground = carouselBackgrounds[baseThemeLook % carouselBackgrounds.length];
   const stickers = useMemo(() => buildStickers(look), [look]);
 
   useEffect(() => {
@@ -169,8 +177,8 @@ export default function JennieExperience({
 
   useEffect(() => {
     const themeMeta = document.querySelector('meta[name="theme-color"]');
-    themeMeta?.setAttribute("content", appearance.backgroundMode === "white" ? "#ffffff" : avatar.bg);
-  }, [appearance.backgroundMode, avatar.bg]);
+    themeMeta?.setAttribute("content", appearance.backgroundMode === "white" ? "#ffffff" : background.bg);
+  }, [appearance.backgroundMode, background.bg]);
 
   useEffect(() => {
     if (!showIntro || reduceMotion) {
@@ -284,9 +292,9 @@ export default function JennieExperience({
   const stageStyle = {
     "--accent": avatar.accent,
     "--accent-deep": avatar.deep,
-    "--page-bg": appearance.backgroundMode === "white" ? "#ffffff" : avatar.bg,
+    "--page-bg": appearance.backgroundMode === "white" ? "#ffffff" : background.bg,
   };
-  const wipeAvatar = themeWipe ? avatarSet[(themeWipe.look * 7) % avatarSet.length] : null;
+  const wipeBackground = themeWipe ? carouselBackgrounds[themeWipe.look % carouselBackgrounds.length] : null;
 
   return (
     <>
@@ -321,10 +329,10 @@ export default function JennieExperience({
       <main ref={stageRef} className={`stage ${embedded ? "is-embedded" : ""} ${appearance.backgroundMode === "white" ? "background-white" : ""} ${showIntro && !reduceMotion ? "stage-intro-open" : ""}`} style={stageStyle}>
         <HalftoneRippleBackground
           backgroundMode={appearance.backgroundMode}
-          baseColor={baseThemeAvatar.bg}
-          baseAccent={baseThemeAvatar.accent}
-          nextColor={wipeAvatar?.bg}
-          nextAccent={wipeAvatar?.accent}
+          baseColor={baseBackground.bg}
+          baseAccent={baseBackground.accent}
+          nextColor={wipeBackground?.bg}
+          nextAccent={wipeBackground?.accent}
           transition={themeWipe}
           transitionDuration={THEME_TRANSITION_DURATION}
           reduceMotion={reduceMotion}

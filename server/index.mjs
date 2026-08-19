@@ -777,6 +777,17 @@ app.get("/api/jobs/:id", (request, response) => {
   response.json(publicJobForRequest(job, request));
 });
 
+app.patch("/api/jobs/:id/appearance", async (request, response) => {
+  const job = jobs.get(request.params.id);
+  if (!job || (!ownsJob(request, job) && !verifyAccessToken(accessTokenFrom(request), job.accessTokenHash))) {
+    return response.status(404).json({error: "没有找到这个作品"});
+  }
+  const appearance = normalizeAppearance(request.body);
+  const next = await updateJob(job.id, {appearance});
+  response.setHeader("Cache-Control", "private, no-store");
+  response.json({appearance: next.appearance});
+});
+
 app.get("/api/jobs/:id/sheet", (request, response) => {
   const job = jobs.get(request.params.id);
   if (!job || (!ownsJob(request, job) && !verifyAccessToken(accessTokenFrom(request), job.accessTokenHash))) return response.status(404).end();
