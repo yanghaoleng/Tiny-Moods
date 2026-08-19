@@ -6,13 +6,13 @@
 
 维护已上线的 `Tiny Moods`：用户上传一张照片，生成九张透明表情、永久互动页和浏览器本机视频；运营后台可查看作品、链接、成本、访问、停留时间与交互埋点。
 
-本轮目标已完成并上线：让用户选择 Lite 时真实调用 Seedream 5.0 Lite，而不是误用 Pro；代码已支持 Lite 专用 API Key、Lite 正确默认 ID 和 Lite 候选 ID 重试，当前火山 Key 实测仍未开通 Lite 权限。
+本轮目标已完成并上线：下线 Lite 模型选择，默认固定使用 Seedream 5.0 Pro；生成进度页增加 1 分钟倒计时和 90% 平滑预进度；详情页手机端点阵扩散与自动换装节奏放慢一倍。
 
 最新修正：保存方案改为直接提供火山引擎生成的完整九宫格原文件；网页互动继续使用抠图后的轻量 WebP，不再生成下载 JPG 或 ZIP。
 
 最新校准：左上角相机图标从上移 `10px` 调整为上移 `5px`，视觉上相对字标下移 `5px`；文字位置不变。
 
-本地待发布改动：无。Lite 模型权限链路修复已随 `20260819200400` 正式发布；用户上传原图保存、后台上传信息展示、Seedream 403 权限错误友好提示已随 `20260819194000` 正式发布；微信内置浏览器作品页 BGM 已改为封面“播放音乐”真实点击后启动，并随 `20260819192708` 正式发布；微信赞赏码、两行 Typer 打赏文案和作者主页国内链接已在上一正式版本上线。
+本地待发布改动：无。固定 Pro、隐藏模型 Switch、手机点阵慢速、生成页 1 分钟倒计时已随 `20260819202300` 正式发布。Lite 模型权限链路修复曾随 `20260819200400` 发布，当前需求改为下线 Lite；用户上传原图保存、后台上传信息展示、Seedream 403 权限错误友好提示已随 `20260819194000` 正式发布。
 
 本次交互精简已随正式版本上线：二维码小窗去掉指向箭头；九图批量保存复用已读取字节并零压缩打包，按钮位于九图列表底部；互动页删除底部重复静音按钮和右下角 `made for` 角标；生成中页面删除底部图标说明。
 
@@ -27,10 +27,10 @@
 - [x] 后台生成详情新增“上传信息”区，展示原图、IP、转发 IP、大致地址线索、设备/系统/浏览器、语言和来源页
 - [x] Seedream `403 AccessDenied`、`Forbidden` 失败对用户显示为模型权限/配置问题；后台仍保留完整内部失败详情
 - [x] 服务启动时迁移历史失败任务的用户可见错误文案，避免 RURU 等旧任务继续显示“换一张清晰正脸照”
-- [x] 本轮实测当前火山方舟 Key：Pro `doubao-seedream-5-0-pro-260628` 可成功生成，Lite `doubao-seedream-5-0-260128` 和 `doubao-seedream-5-0-lite-260128` 均返回 `403 AccessDenied`
-- [x] Lite 默认模型 ID 改为 `doubao-seedream-5-0-lite-260128`，旧 `doubao-seedream-5-0-260128` 作为 Lite fallback；Lite 失败只在 Lite ID 内重试，不自动改用 Pro
-- [x] 新增 `SEEDREAM_LITE_API_KEY` / `SEEDREAM_PRO_API_KEY` / `ARK_LITE_API_KEY` / `ARK_PRO_API_KEY` 分层密钥配置，支持为 Lite 单独配置已开通权限的 Key
-- [ ] 火山后台仍需为当前 Key 开通 Lite，或在生产 `/etc/9face.env` 配置已开通 Lite 的 `SEEDREAM_LITE_API_KEY`
+- [x] 按最新决策下线 Lite：前端打赏层不再显示模型 Switch，按钮固定显示“用 5.0 Pro 生成”
+- [x] 后端 `imageModelOptions` 只暴露 Pro；默认模型固定 `pro`，旧客户端或旧订单残留 Lite 时归一到 Pro
+- [x] 详情页手机与触摸设备点阵扩散从 `1200ms` 放慢到 `2400ms`，自动换装从 `1500ms` 放慢到 `3000ms`，桌面保持原速
+- [x] 生成进度页按 1 分钟每秒倒计时，进度条 60 秒内平滑到 `90%`，真实完成后立即进入作品页
 
 - [x] 微信页签改用完整 `559×559` 微信原生赞赏码 JPEG，支付宝页签继续使用 WebP
 - [x] 打赏费用说明在句号后强制换行，字号放大到 `0.98rem–1.04rem`，弹窗每次打开时逐字经过 3 个 Typer 状态入场
@@ -108,7 +108,7 @@
 - [x] 本地用钉钉下载图创建 DEMO 任务成功；任务按 Lite 模型入队，没有本地人脸清晰度拦截
 - [x] 本地 `job.json` 验证 `upload-original.jpg` 已落盘，上传源图字段包含 `3985525B / 4284×5711 / jpeg`
 - [x] 本地后台详情接口返回 `uploadedSourceUrl`、`uploadedSource` 和 `uploadRequest`；`/api/admin/jobs/:id/upload` 返回 `200 image/jpeg`
-- [x] 线上 `/api/health` 返回 `ok=true`、`configured=true`、`defaultImageModel=lite`
+- [x] 历史版本曾验证线上 `/api/health` 返回 `ok=true`、`configured=true`
 - [x] 线上首页和 `/admin` 均返回 `200`；主 JS 与 CSS SHA-256 与本地构建一致
 - [x] 线上 RURU 与丽丽历史失败任务已迁移为“生成模型暂时没有访问权限”，后台仍保留完整 `403 AccessDenied` 内部详情
 
@@ -148,7 +148,7 @@
 - [x] 本轮模型选择改动 `npm run build` 通过，638 个模块完成构建；服务端三个模块语法检查通过
 - [x] 本地 DEMO 端到端验证：非法模型返回 `400`；Lite 订单、任务、生成阶段与后台均保持 `lite / ¥0.22 / 2144x2144`；Pro 订单为 `pro / ¥0.60`
 - [x] 默认、Lite、Pro 三种下单路径复核通过：默认与 Lite 均使用 `doubao-seedream-5-0-260128`，Pro 使用 `doubao-seedream-5-0-pro-260628`
-- [x] 线上 `/api/health` 返回 `defaultImageModel=lite`；首页 JS/CSS 与本地构建 SHA-256 一致，左上角品牌规则含 `translateY(10px)`
+- [x] 历史版本曾验证首页 JS/CSS 与本地构建 SHA-256 一致，左上角品牌规则含 `translateY(10px)`
 - [x] 品牌图标上移后完成 `1280×800` 与 `390×844` 实截图验收；线上指纹 CSS 含 `.generator-brand-mark{transform:translateY(-10px)}`
 - [x] 本轮 `npm run build` 通过，638 个模块完成构建；`node --check server/index.mjs` 与 `git diff --check` 通过
 - [x] 本地接口串联验证：同一 Cookie 可读取刚创建的进行中任务，历史项返回固定 `?job=:id`，重新读取任务返回 `owned=true`
@@ -158,10 +158,11 @@
 ## 发布状态
 
 - 本轮运行提交为 `c84240a`，已推送至 GitHub `main` 并发布到 `/opt/9face/releases/20260819194000`
+- 固定 Pro、手机点阵慢速和进度倒计时版本已推送至 GitHub `main` 并发布到 `/opt/9face/releases/20260819202300`
 - Lite 权限链路提交为 `7024635`，发布记录提交随 `20260819200400` 一起推送至 GitHub `main`；生产代码只会在 Lite 模型 ID 内重试，不会自动改用 Pro
 - 本轮合并提交为 `ff4679a`，已推送至 GitHub `main`；其中保留 `7815eb5` 移动端与图片链路优化，并合入 `fb23fb3` 品牌图标对齐
 - 历史“下载 AI 原图”核心提交 `6401c8e` 已随本次推送进入 GitHub `main`
-- 当前线上发布 `20260819200400`，直接回滚点 `20260819194000`；本次只更新模型调用配置逻辑，不需要数据库迁移，沿用 `/var/lib/9face` 原目录
+- 当前线上发布 `20260819202300`，直接回滚点 `20260819200400`；本次只更新前端交互和模型档位配置，不需要数据库迁移，沿用 `/var/lib/9face` 原目录
 - `9face.service` 为 `active`，`/api/health` 返回 `ok=true`，公网首页与 `/admin` 均返回 `200`
 - API Key、管理密码、会话密钥、埋点盐和运行数据仅保存在服务器环境文件或数据目录，敏感信息扫描已通过，未进入公开仓库
 

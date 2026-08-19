@@ -257,9 +257,6 @@ const writeUploadedSource = async (file, directory) => {
 };
 const friendlyGenerationError = (error) => {
   const message = error instanceof Error ? error.message : String(error || "");
-  if (/Lite.*403|尚未开通 Lite|Lite 模型权限/i.test(message)) {
-    return "Seedream 5.0 Lite 暂未开通调用权限，请联系作者处理";
-  }
   if (/Seedream 请求失败（?403|AccessDenied|Forbidden/i.test(message)) {
     return "生成模型暂时没有访问权限，请稍后再试，或联系管理员检查火山方舟模型权限";
   }
@@ -808,8 +805,7 @@ app.post("/api/orders/donation", async (request, response) => {
   const now = new Date();
   const title = String(request.body.title || "我的").replace(/[<>/\\]/g, "").trim().slice(0, 20) || "我的";
   const requestedModelKey = String(request.body.model || defaultImageModelKey());
-  const selectedModel = findImageModel(requestedModelKey);
-  if (!selectedModel) return response.status(400).json({error: "请选择可用的生成模型"});
+  const selectedModel = findImageModel(requestedModelKey) || resolveImageModel(defaultImageModelKey());
   const order = {
     id,
     title,
@@ -920,13 +916,14 @@ app.post("/api/jobs", photoUpload.single("photo"), async (request, response) => 
   const now = Date.now();
   const createdAt = new Date(now).toISOString();
   const fallbackModel = resolveImageModel(order.modelTier);
+  const keepOrderModelSnapshot = order.modelTier === fallbackModel.key;
   const selectedModel = {
     ...fallbackModel,
-    key: order.modelTier || fallbackModel.key,
-    label: order.modelLabel || fallbackModel.label,
-    model: order.model || fallbackModel.model,
-    size: order.generatedImageSize || fallbackModel.size,
-    priceCny: order.suggestedDonationCny || fallbackModel.priceCny,
+    key: fallbackModel.key,
+    label: keepOrderModelSnapshot ? order.modelLabel || fallbackModel.label : fallbackModel.label,
+    model: keepOrderModelSnapshot ? order.model || fallbackModel.model : fallbackModel.model,
+    size: keepOrderModelSnapshot ? order.generatedImageSize || fallbackModel.size : fallbackModel.size,
+    priceCny: keepOrderModelSnapshot ? order.suggestedDonationCny || fallbackModel.priceCny : fallbackModel.priceCny,
   };
   const directory = path.join(generatedRoot, id);
   await mkdir(directory, {recursive: true});

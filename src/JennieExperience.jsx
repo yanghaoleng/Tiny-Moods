@@ -51,6 +51,7 @@ const stickerSlots = [
 
 const THEME_TRANSITION_DURATION = 1200;
 const AUTO_CHANGE_INTERVAL = 1500;
+const mobileMotionQuery = "(max-width: 768px), (pointer: coarse)";
 const isWeChatBrowser = () =>
   typeof navigator !== "undefined" && /MicroMessenger/i.test(navigator.userAgent);
 const carouselBackgrounds = [
@@ -77,6 +78,23 @@ function buildStickers(look) {
         : scribbleImages[(look * 7 + index * 5) % scribbleImages.length],
     };
   });
+}
+
+function useMobileMotionPacing() {
+  const [slowMobileMotion, setSlowMobileMotion] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return undefined;
+    const query = window.matchMedia(mobileMotionQuery);
+    const update = () => setSlowMobileMotion(query.matches);
+    update();
+    if (typeof query.addEventListener === "function") {
+      query.addEventListener("change", update);
+      return () => query.removeEventListener("change", update);
+    }
+    query.addListener?.(update);
+    return () => query.removeListener?.(update);
+  }, []);
+  return slowMobileMotion;
 }
 
 function Sticker({ sticker, index, look, reduceMotion }) {
@@ -150,6 +168,7 @@ export default function JennieExperience({
   appearance = {backgroundMode: "color", patternStyle: "dots", decorations: true},
 }) {
   const reduceMotion = useReducedMotion();
+  const slowMobileMotion = useMobileMotionPacing();
   const avatarSet = customAvatars?.length ? customAvatars : jennieAvatars;
   const [look, setLook] = useState(0);
   const [baseThemeLook, setBaseThemeLook] = useState(0);
@@ -170,6 +189,8 @@ export default function JennieExperience({
   const avatar = avatarSet[avatarIndex];
   const background = carouselBackgrounds[look % carouselBackgrounds.length];
   const baseBackground = carouselBackgrounds[baseThemeLook % carouselBackgrounds.length];
+  const halftoneTransitionDuration = slowMobileMotion ? THEME_TRANSITION_DURATION * 2 : THEME_TRANSITION_DURATION;
+  const autoChangeInterval = slowMobileMotion ? AUTO_CHANGE_INTERVAL * 2 : AUTO_CHANGE_INTERVAL;
   const stickers = useMemo(() => buildStickers(look), [look]);
 
   useEffect(() => {
@@ -278,24 +299,24 @@ export default function JennieExperience({
       themeTimer.current = window.setTimeout(() => {
         setBaseThemeLook(nextLook);
         setThemeWipe((current) => (current?.id === id ? null : current));
-      }, THEME_TRANSITION_DURATION);
+      }, halftoneTransitionDuration);
     }
 
-  }, [lookCount, reduceMotion]);
+  }, [halftoneTransitionDuration, lookCount, reduceMotion]);
 
   useEffect(() => {
     let interval;
     const introDelay = reduceMotion ? 400 : 3200;
     const introTimer = window.setTimeout(() => {
       changeLook();
-      interval = window.setInterval(() => changeLook(), AUTO_CHANGE_INTERVAL);
+      interval = window.setInterval(() => changeLook(), autoChangeInterval);
     }, introDelay);
 
     return () => {
       window.clearTimeout(introTimer);
       window.clearInterval(interval);
     };
-  }, [changeLook, reduceMotion]);
+  }, [autoChangeInterval, changeLook, reduceMotion]);
 
   const stageStyle = {
     "--accent": avatar.accent,
@@ -364,7 +385,7 @@ export default function JennieExperience({
           nextColor={wipeBackground?.bg}
           nextAccent={wipeBackground?.accent}
           transition={themeWipe}
-          transitionDuration={THEME_TRANSITION_DURATION}
+          transitionDuration={halftoneTransitionDuration}
           reduceMotion={reduceMotion}
         />
         <div className="experience-top-actions" aria-label="互动页快捷设置">

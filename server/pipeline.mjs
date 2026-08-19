@@ -84,15 +84,11 @@ export const getSeedreamBuffer = async (sourceBuffer, selectedModel) => {
     if (!response.ok) {
       const details = (await response.text()).slice(0, 1200);
       lastFailure = {status: response.status, details, model, requestId};
-      if (selectedModel.key === "lite" && response.status === 403 && modelIds.length > 1) continue;
       throw new Error(`Seedream 请求失败（${response.status}）：${details}`);
     }
     return await seedreamResponseToBuffer(response, requestId);
   }
 
-  if (lastFailure?.status === 403 && selectedModel.key === "lite") {
-    throw new Error(`Seedream 5.0 Lite 请求失败（403）：当前火山账号或 API Key 尚未开通 Lite 模型权限；已尝试 ${modelIds.join("、")}，不会自动改用 Pro。原始错误：${lastFailure.details}`);
-  }
   if (lastFailure) throw new Error(`Seedream 请求失败（${lastFailure.status}）：${lastFailure.details}`);
   throw new Error("Seedream 请求失败：没有可用的模型 ID");
 };
@@ -156,13 +152,14 @@ async function makeDemoSheet(sourceBuffer, jobDirectory) {
 export async function runGenerationPipeline({job, sourceBuffer, projectRoot, generatedRoot, publicOrigin, update}) {
   const jobDirectory = path.join(generatedRoot, job.id);
   const fallbackModel = resolveImageModel(job.modelTier);
+  const keepJobModelSnapshot = job.modelTier === fallbackModel.key;
   const selectedModel = {
     ...fallbackModel,
-    key: job.modelTier || fallbackModel.key,
-    label: job.modelLabel || fallbackModel.label,
-    model: job.model || fallbackModel.model,
-    size: job.generatedImageSize || fallbackModel.size,
-    priceCny: job.suggestedDonationCny || fallbackModel.priceCny,
+    key: fallbackModel.key,
+    label: keepJobModelSnapshot ? job.modelLabel || fallbackModel.label : fallbackModel.label,
+    model: keepJobModelSnapshot ? job.model || fallbackModel.model : fallbackModel.model,
+    size: keepJobModelSnapshot ? job.generatedImageSize || fallbackModel.size : fallbackModel.size,
+    priceCny: keepJobModelSnapshot ? job.suggestedDonationCny || fallbackModel.priceCny : fallbackModel.priceCny,
   };
   await mkdir(jobDirectory, {recursive: true});
 

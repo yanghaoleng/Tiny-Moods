@@ -26,9 +26,11 @@ const MAX_FILE_SIZE = 12 * 1024 * 1024;
 const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 const defaultAppearance = {backgroundMode: "color", patternStyle: "dots", decorations: true};
 const fallbackDonationModels = [
-  {key: "lite", label: "Seedream 5.0 Lite", description: "日常生成，成本更低", size: "2144x2144", priceCny: "0.22"},
   {key: "pro", label: "Seedream 5.0 Pro", description: "更高画质与复杂指令表现", size: "2144x2144", priceCny: "0.60"},
 ];
+const defaultGenerationModelKey = "pro";
+const generationCountdownSeconds = 60;
+const generationProgressCap = 90;
 const donationThanksCopies = [
   "谢谢有品位的您！",
   "感谢您的慷慨支持！",
@@ -931,8 +933,19 @@ function QrShareBubble({job, onClose}) {
 }
 
 function JobStatus({job, statusError, local, backLabel = "制作新作品", onBack}) {
-  const progress = Math.max(0, Math.min(100, local.error ? local.progress : local.active ? local.progress : job?.progress || 0));
   const failed = job?.status === "failed";
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (failed || job?.status === "ready") return undefined;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [failed, job?.status]);
+  const createdAt = Number.isFinite(Date.parse(job?.createdAt || "")) ? Date.parse(job.createdAt) : now;
+  const elapsedSeconds = Math.max(0, Math.floor((now - createdAt) / 1000));
+  const countdownSeconds = Math.max(0, generationCountdownSeconds - elapsedSeconds);
+  const projectedProgress = Math.min(generationProgressCap, Math.round((Math.min(elapsedSeconds, generationCountdownSeconds) / generationCountdownSeconds) * generationProgressCap));
+  const actualProgress = local.error ? local.progress : local.active ? local.progress : job?.progress || 0;
+  const progress = Math.max(0, Math.min(100, failed ? actualProgress : Math.max(actualProgress, projectedProgress)));
   const stage = local.error || local.stage || job?.stage || "正在读取任务";
 
   return (
@@ -951,7 +964,7 @@ function JobStatus({job, statusError, local, backLabel = "制作新作品", onBa
         <p className="job-kicker">{failed || local.error ? "需要处理" : "请不要关闭本页面"}</p>
         <h1>{stage}</h1>
         <p className="job-description">
-          {failed ? job?.error || statusError || "请稍后重试。" : local.error ? "本地拆图没有成功，原始母图仍安全保留，可以直接重试。" : "九宫格拆图和抠背景都在当前浏览器中完成。"}
+          {failed ? job?.error || statusError || "请稍后重试。" : local.error ? "本地拆图没有成功，原始母图仍安全保留，可以直接重试。" : `预计时间 1 分钟，剩余约 ${countdownSeconds} 秒。九宫格拆图和抠背景会在当前浏览器中完成。`}
         </p>
         {!failed ? <div className="job-progress" aria-label={`当前进度 ${progress}%`}><div className="job-progress-fill" style={{transform: `scaleX(${progress / 100})`}} /></div> : null}
         {job?.avatars?.length ? (
@@ -1271,11 +1284,7 @@ function DonationDialog({busy, error, models = fallbackDonationModels, onClose, 
   const [method, setMethod] = useState("wechat");
   const [wechatCopied, setWechatCopied] = useState(false);
   const [supportCopy] = useState(() => `生成图片会产生费用，不需要给太多。\n${donationThanksCopies[Math.floor(Math.random() * donationThanksCopies.length)]}`);
-  const switchModels = ["lite", "pro"].map((key) => models.find((model) => model.key === key)).filter(Boolean);
-  const [selectedModelKey, setSelectedModelKey] = useState(() => (
-    models.some((model) => model.key === "lite") ? "lite" : models[0]?.key || "lite"
-  ));
-  const selectedModel = models.find((model) => model.key === selectedModelKey) || switchModels[0] || fallbackDonationModels[0];
+  const selectedModel = models.find((model) => model.key === defaultGenerationModelKey) || fallbackDonationModels[0];
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -1292,24 +1301,7 @@ function DonationDialog({busy, error, models = fallbackDonationModels, onClose, 
     <motion.div className="donation-backdrop" initial={reduceMotion ? false : {opacity: 0}} animate={{opacity: 1}} exit={{opacity: 0}} onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}>
       <motion.section className="donation-dialog" initial={reduceMotion ? false : {opacity: 0, y: 24, scale: 0.97}} animate={{opacity: 1, y: 0, scale: 1}} exit={reduceMotion ? {opacity: 0} : {opacity: 0, y: 12}} role="dialog" aria-modal="true" aria-labelledby="donation-title">
         <button type="button" className="donation-close" onClick={onClose} data-uisfx="close" data-analytics-action="donation_close" aria-label="关闭打赏说明"><X weight="bold" /></button>
-        <h2 id="donation-title">选择生成模型</h2>
-        <div className="donation-model-switch" role="radiogroup" aria-label="选择生成模型">
-          {switchModels.map((model) => (
-            <button
-              type="button"
-              role="radio"
-              aria-checked={selectedModel.key === model.key}
-              className={selectedModel.key === model.key ? "is-selected" : ""}
-              onClick={() => setSelectedModelKey(model.key)}
-              data-uisfx="select"
-              data-analytics-action="donation_model"
-              data-analytics-target={model.key}
-              key={model.key}
-            >
-              {model.key === "lite" ? "Lite" : model.key === "pro" ? "Pro" : model.label}
-            </button>
-          ))}
-        </div>
+        <h2 id="donation-title">准备开始生成</h2>
         <div className="donation-amount">
           <strong>¥1 ~ ¥3</strong>
         </div>
@@ -1622,15 +1614,16 @@ function Landing({resumeOrderId, onRenderExample, onJobCreated, onOpenWork}) {
     setDonationOpen(true);
   };
 
-  const continueAfterDonation = async (selectedModelKey) => {
+  const continueAfterDonation = async (selectedModelKey = defaultGenerationModelKey) => {
+    const modelKey = selectedModelKey || defaultGenerationModelKey;
     setSubmitting(true);
     setError("");
-    trackEvent("generation_started", {titleLength: subjectName.trim().length, model: selectedModelKey});
+    trackEvent("generation_started", {titleLength: subjectName.trim().length, model: modelKey});
     try {
       const response = await fetch(`${API_BASE}/orders/donation`, {
         method: "POST",
         headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({title: subjectName.trim(), model: selectedModelKey}),
+        body: JSON.stringify({title: subjectName.trim(), model: modelKey}),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "生成凭证创建失败");

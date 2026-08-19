@@ -29,8 +29,8 @@
 | 日系相册 / C 方案 | 首页固定的明亮轻日系视觉 | `.landing-theme` |
 | 打赏弹窗 | 免费生成前说明层 | `DonationDialog` |
 | 微信赞赏码 / 长按打赏图 | 微信原生个人赞赏码，不接 API 且不校验支付 | `public/donate/wechat-appreciation-code.jpg` / `.donation-qr-frame` / `DonationDialog` |
-| 选模型 / Pro 和 Lite / 默认 Lite | 打赏层中的双段 Switch；默认 Lite，提交所选 `model` 键 | `fallbackDonationModels` / `.donation-model-switch` / `selectedModelKey` / `image-models.mjs` |
-| Lite 没权限 / 选 Lite 还失败 | Seedream 5.0 Lite 真实模型调用权限；只尝试 Lite ID，不自动用 Pro 兜底 | `SEEDREAM_LITE_API_KEY` / `SEEDREAM_LITE_MODEL` / `SEEDREAM_LITE_FALLBACK_MODELS` / `candidateImageModelIds` / `imageModelApiKey` |
+| 选模型 / Pro 和 Lite / 默认 Lite | 已下线的模型 Switch；当前前后台固定 Pro，不向用户展示选择 | `fallbackDonationModels` / `defaultGenerationModelKey` / `image-models.mjs` |
+| Lite 没权限 / 选 Lite 还失败 | 已通过移除 Lite 规避；旧客户端传入 Lite 时后端归一到 Pro | `resolveImageModel` / `/api/orders/donation` / `modelTier=pro` |
 | ¥1 ~ ¥3 / 打赏金额 | 无“建议打赏”前缀的固定自愿支持区间 | `.donation-amount` / `suggestedDonationCny` |
 | 价格下面的小字 / 感谢文案 | 建议打赏金额下方的两行支持感谢语，逐字 Typer 入场 | `.donation-support-copy` / `TyperSupportCopy` |
 | ¥1 ~ ¥3 | 固定的自愿打赏建议区间 | `.donation-amount` |
@@ -67,8 +67,9 @@
 | 同步首页案例 | 永久作品转 720px 透明 WebP | `scripts/sync-home-examples.mjs` |
 | 大头 | 主交互透明主体 | `.portrait` / `avatar` |
 | 人物白边 | Alpha 通道描边 | `.portrait` 的 `drop-shadow` |
-| 波纹 | 半调点阵高亮扩散 | `HalftoneRippleBackground` |
-| 自动慢慢换一个 / Hover 不打断 | 独立于悬停状态的自动换装计时器 | `AUTO_CHANGE_INTERVAL` / `changeLook`；头像按钮无 `whileHover` |
+| 波纹 / 点阵太快 | 半调点阵高亮扩散；手机端扩散时长为桌面两倍 | `HalftoneRippleBackground` / `halftoneTransitionDuration` / `useMobileMotionPacing` |
+| 自动慢慢换一个 / Hover 不打断 | 独立于悬停状态的自动换装计时器；手机端间隔为桌面两倍 | `AUTO_CHANGE_INTERVAL` / `autoChangeInterval` / `changeLook`；头像按钮无 `whileHover` |
+| 预计时间 / 倒计时 / 进度条 | 生成进度页按 1 分钟倒计时，进度条平滑走到 90% | `JobStatus` / `generationCountdownSeconds` / `generationProgressCap` |
 | 立即播放音乐 / 首次点击补播 / 微信里开一下又关 | BGM 自动播放、微信显式点击播放与浏览器策略回退 | `autoPlay` / `preload="auto"` / `requestAudioPlay` / `wechatAudioConsent` / `playing` |
 | 互动 WebP / 抠图后图片 | 九张 1080px 透明 WebP，只用于网页互动、二维码和视频 | `avatar.src` / `writeFaceWebp` / `/generated/:id/face-XX.webp` |
 | 全部图片压缩 | 静态 PNG 批量转 WebP | `npm run images:optimize` / `scripts/optimize-static-images.mjs` |
