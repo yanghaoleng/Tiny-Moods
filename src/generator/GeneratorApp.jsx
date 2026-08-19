@@ -1,12 +1,12 @@
 import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from "react";
 import {AnimatePresence, motion, useReducedMotion} from "motion/react";
-import {ArrowLeft} from "@phosphor-icons/react/ArrowLeft";
 import {ArrowRight} from "@phosphor-icons/react/ArrowRight";
 import {Check} from "@phosphor-icons/react/Check";
 import {DownloadSimple} from "@phosphor-icons/react/DownloadSimple";
 import {ImagesSquare} from "@phosphor-icons/react/ImagesSquare";
 import {PlayCircle} from "@phosphor-icons/react/PlayCircle";
 import {CopySimple} from "@phosphor-icons/react/CopySimple";
+import {QrCode} from "@phosphor-icons/react/QrCode";
 import {ShieldCheck} from "@phosphor-icons/react/ShieldCheck";
 import {UploadSimple} from "@phosphor-icons/react/UploadSimple";
 import {WechatLogo} from "@phosphor-icons/react/WechatLogo";
@@ -29,7 +29,7 @@ const sunTheme = {accent: "#e0a33e", deep: "#79561b", bg: "#f7ead4"};
 const clayTheme = {accent: "#c58159", deep: "#68432c", bg: "#f2e2d9"};
 const crayonDoodles = Array.from(
   {length: 12},
-  (_, index) => `${import.meta.env.BASE_URL}decorations/crayon-scribble-${String(index + 1).padStart(2, "0")}.png`,
+  (_, index) => `${import.meta.env.BASE_URL}decorations/crayon-scribble-${String(index + 1).padStart(2, "0")}.webp`,
 );
 const brandFixedLetters = [..."Tiny"];
 const brandMoodLetters = [..."Moods"];
@@ -569,11 +569,10 @@ function ExamplePortrait({profile, index, reduceMotion, onOpen}) {
   const [faceIndex, setFaceIndex] = useState(index % profile.avatars.length);
 
   useEffect(() => {
-    profile.avatars.forEach(({src}) => {
-      const image = new Image();
-      image.src = src;
-    });
-  }, [profile.avatars]);
+    const image = new Image();
+    image.decoding = "async";
+    image.src = profile.avatars[(faceIndex + 1) % profile.avatars.length].src;
+  }, [faceIndex, profile.avatars]);
 
   useEffect(() => {
     if (reduceMotion) return undefined;
@@ -611,6 +610,8 @@ function ExamplePortrait({profile, index, reduceMotion, onOpen}) {
             key={avatar.src}
             src={avatar.src}
             alt={`${profile.name} 示例表情 ${faceIndex + 1}`}
+            decoding="async"
+            loading={index > 1 ? "lazy" : "eager"}
             initial={reduceMotion ? false : {opacity: 0, scale: 0.72, rotate: index % 2 ? 7 : -7}}
             animate={{opacity: 1, scale: 1, rotate: 0}}
             exit={reduceMotion ? undefined : {opacity: 0, scale: 1.16, rotate: index % 2 ? -6 : 6}}
@@ -626,15 +627,81 @@ function ExamplePortrait({profile, index, reduceMotion, onOpen}) {
   );
 }
 
-async function buildQrCodeDataUrl(shareUrl) {
+const loadImageElement = (src) => new Promise((resolve, reject) => {
+  const image = new Image();
+  image.onload = () => resolve(image);
+  image.onerror = () => reject(new Error("图片读取失败"));
+  image.src = src;
+});
+
+async function buildQrCodeDataUrl(shareUrl, avatarUrl) {
   const {default: QRCode} = await import("qrcode");
-  return QRCode.toDataURL(shareUrl, {
+  const qrDataUrl = await QRCode.toDataURL(shareUrl, {
     errorCorrectionLevel: "H",
     width: 1080,
     margin: 4,
     color: {dark: "#1d1b1eff", light: "#fbfbfaff"},
   });
+  if (!avatarUrl) return qrDataUrl;
+
+  try {
+    const response = await fetch(avatarUrl);
+    if (!response.ok) return qrDataUrl;
+    const avatarObjectUrl = URL.createObjectURL(await response.blob());
+    try {
+      const [qrImage, avatarImage] = await Promise.all([
+        loadImageElement(qrDataUrl),
+        loadImageElement(avatarObjectUrl),
+      ]);
+      const size = 1080;
+      const center = size / 2;
+      const bubbleRadius = 126;
+      const avatarSize = 208;
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+      const context = canvas.getContext("2d");
+      if (!context) return qrDataUrl;
+      context.drawImage(qrImage, 0, 0, size, size);
+      context.fillStyle = "#fbfbfa";
+      context.beginPath();
+      context.arc(center, center, bubbleRadius, 0, Math.PI * 2);
+      context.fill();
+      const ratio = Math.min(avatarSize / avatarImage.naturalWidth, avatarSize / avatarImage.naturalHeight);
+      const width = avatarImage.naturalWidth * ratio;
+      const height = avatarImage.naturalHeight * ratio;
+      context.drawImage(avatarImage, center - width / 2, center - height / 2, width, height);
+      return canvas.toDataURL("image/png");
+    } finally {
+      URL.revokeObjectURL(avatarObjectUrl);
+    }
+  } catch {
+    return qrDataUrl;
+  }
 }
+
+const shareUrlForJob = (job) => new URL(
+  job.pageUrl || `${import.meta.env.BASE_URL}?view=${encodeURIComponent(job.id)}`,
+  window.location.origin,
+).href;
+
+const copyText = async (value) => {
+  try {
+    await navigator.clipboard.writeText(value);
+    return;
+  } catch {
+    const field = document.createElement("textarea");
+    field.value = value;
+    field.setAttribute("readonly", "");
+    field.style.position = "fixed";
+    field.style.opacity = "0";
+    document.body.appendChild(field);
+    field.select();
+    const copied = document.execCommand("copy");
+    field.remove();
+    if (!copied) throw new Error("复制失败");
+  }
+};
 
 const safeFilenamePart = (value) => value.replace(/[\\/:*?"<>|]/g, "-").trim() || "作品";
 
@@ -651,10 +718,11 @@ const imageExtension = (src, mimeType = "") => {
 };
 
 const prepareAvatarFiles = async (avatars, title) => Promise.all(avatars.map(async (avatar, index) => {
-  const response = await fetch(avatar.src);
+  const source = avatar.downloadSrc || avatar.src;
+  const response = await fetch(source);
   if (!response.ok) throw new Error(`第 ${index + 1} 张图片读取失败`);
   const blob = await response.blob();
-  const extension = imageExtension(avatar.src, blob.type);
+  const extension = imageExtension(source, blob.type);
   return new File([blob], `${safeFilenamePart(title)}-透明表情-${String(index + 1).padStart(2, "0")}.${extension}`, {type: blob.type || `image/${extension}`});
 }));
 
@@ -677,33 +745,17 @@ const downloadFilesAsZip = async (files, title) => {
   window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1500);
 };
 
-function ShareSettingsSheet({job, appearance, onClose, onRender}) {
+function SaveImagesSheet({job, appearance, onClose, onRender}) {
   const reduceMotion = useReducedMotion();
-  const [view, setView] = useState("share");
-  const [qrDataUrl, setQrDataUrl] = useState("");
-  const [copyState, setCopyState] = useState("");
   const [preparedFiles, setPreparedFiles] = useState([]);
   const [saveAllState, setSaveAllState] = useState("");
   const [savingAll, setSavingAll] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const copyTimer = useRef(null);
   const saveAllTimer = useRef(null);
-  const shareUrl = useMemo(() => {
-    const url = new URL(job.pageUrl || `${import.meta.env.BASE_URL}?view=${encodeURIComponent(job.id)}`, window.location.origin);
-    return url.href;
-  }, [job.id, job.pageUrl]);
 
   useEffect(() => {
-    let active = true;
-    void buildQrCodeDataUrl(shareUrl)
-      .then((value) => { if (active) setQrDataUrl(value); })
-      .catch(() => { if (active) setQrDataUrl(""); });
-    return () => { active = false; };
-  }, [shareUrl]);
-
-  useEffect(() => {
-    if (view !== "faces" || preparedFiles.length === job.avatars.length) return undefined;
+    if (preparedFiles.length === job.avatars.length) return undefined;
     let active = true;
     setSaveAllState("正在准备 9 张图片");
     void prepareAvatarFiles(job.avatars, job.title)
@@ -718,7 +770,7 @@ function ShareSettingsSheet({job, appearance, onClose, onRender}) {
         setError(requestError.message);
       });
     return () => { active = false; };
-  }, [job.avatars, job.title, preparedFiles.length, view]);
+  }, [job.avatars, job.title, preparedFiles.length]);
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -728,23 +780,9 @@ function ShareSettingsSheet({job, appearance, onClose, onRender}) {
     return () => {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", onKeyDown);
-      window.clearTimeout(copyTimer.current);
       window.clearTimeout(saveAllTimer.current);
     };
   }, [onClose]);
-
-  const copyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      setCopyState("已复制");
-      playUISfx("copy");
-    } catch {
-      setCopyState("请长按链接复制");
-      playUISfx("error");
-    }
-    window.clearTimeout(copyTimer.current);
-    copyTimer.current = window.setTimeout(() => setCopyState(""), 1800);
-  };
 
   const saveVideo = async () => {
     setSubmitting(true);
@@ -796,55 +834,77 @@ function ShareSettingsSheet({job, appearance, onClose, onRender}) {
         transition={{type: "spring", stiffness: 330, damping: 30}}
         role="dialog"
         aria-modal="true"
-        aria-labelledby={view === "faces" ? "share-faces-title" : "share-sheet-title"}
+        aria-labelledby="share-faces-title"
       >
-        <button type="button" className="share-sheet-close" onClick={onClose} data-uisfx="close" data-analytics-action="share_close" aria-label="关闭分享设置"><X weight="bold" /></button>
-        <AnimatePresence initial={false} mode="wait">
-          {view === "faces" ? (
-            <motion.div key="faces" className="share-faces-view" initial={reduceMotion ? false : {opacity: 0, x: 18}} animate={{opacity: 1, x: 0}} exit={reduceMotion ? {opacity: 0} : {opacity: 0, x: 18}} transition={{duration: reduceMotion ? 0 : 0.22}}>
-              <button type="button" className="share-sheet-back" onClick={() => { setView("share"); setError(""); }} data-uisfx="back" data-analytics-action="share_back"><ArrowLeft weight="bold" />保存和分享</button>
-              <div className="share-faces-heading">
-                <h2 id="share-faces-title">保存九张图片</h2>
-                <p>点按看大图，或长按每张图片保存</p>
-              </div>
-              <button type="button" className="share-action-button share-action-primary share-save-all" onClick={saveAllFaces} disabled={savingAll || preparedFiles.length !== job.avatars.length} data-uisfx={preparedFiles.length === job.avatars.length ? "start" : "blocked"} data-analytics-action="faces_save_all"><DownloadSimple weight="bold" />{saveAllState || "一键保存 9 张"}</button>
-              <p className="share-save-all-note">手机会打开系统保存，电脑会下载含 9 张原图的 ZIP</p>
-              <div className="share-face-grid" role="list" aria-label="九张透明表情">
-                {job.avatars.map((avatar, index) => (
-                  <a key={avatar.src} className="share-face-item" href={avatar.src} target="_blank" rel="noreferrer" role="listitem" aria-label={`查看第 ${index + 1} 张大图`} data-uisfx="open" data-analytics-action="face_open" data-analytics-target={String(index + 1)}>
-                    <img src={avatar.src} alt={`${job.title}透明表情 ${index + 1}`} />
-                    <span aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
-                  </a>
-                ))}
-              </div>
-              {error ? <p className="share-sheet-error">{error}</p> : null}
-            </motion.div>
-          ) : (
-            <motion.div key="share" initial={reduceMotion ? false : {opacity: 0, x: -18}} animate={{opacity: 1, x: 0}} exit={reduceMotion ? {opacity: 0} : {opacity: 0, x: -18}} transition={{duration: reduceMotion ? 0 : 0.22}}>
-              <div className="share-sheet-heading">
-                <div><h2 id="share-sheet-title">保存和分享</h2><p>保存表情、二维码或视频</p></div>
-              </div>
+        <button type="button" className="share-sheet-close" onClick={onClose} data-uisfx="close" data-analytics-action="save_images_close" aria-label="关闭保存图片"><X weight="bold" /></button>
+        <div className="share-faces-view">
+          <div className="share-faces-heading">
+            <h2 id="share-faces-title">保存九张图片</h2>
+            <p>点按看原图，也可以长按每张图片保存</p>
+          </div>
+          <button type="button" className="share-action-button share-action-primary share-save-all" onClick={saveAllFaces} disabled={savingAll || preparedFiles.length !== job.avatars.length} data-uisfx={preparedFiles.length === job.avatars.length ? "start" : "blocked"} data-analytics-action="faces_save_all"><DownloadSimple weight="bold" />{saveAllState || "一键保存 9 张"}</button>
+          <p className="share-save-all-note">手机会打开系统保存，电脑会下载含 9 张原图的 ZIP</p>
+          <div className="share-face-grid" role="list" aria-label="九张透明表情">
+            {job.avatars.map((avatar, index) => (
+              <a key={avatar.src} className="share-face-item" href={avatar.downloadSrc || avatar.src} target="_blank" rel="noreferrer" role="listitem" aria-label={`查看第 ${index + 1} 张大图`} data-uisfx="open" data-analytics-action="face_open" data-analytics-target={String(index + 1)}>
+                <img src={avatar.src} alt={`${job.title}透明表情 ${index + 1}`} decoding="async" />
+                <span aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
+              </a>
+            ))}
+          </div>
+          {error ? <p className="share-sheet-error">{error}</p> : null}
+          <div className="share-video-section">
+            <button type="button" className="share-save-video" onClick={saveVideo} data-uisfx="start" data-analytics-action="video_generate" disabled={submitting}><DownloadSimple weight="bold" />{submitting ? "正在打开视频生成" : "保存视频"}</button>
+            <p>测试功能，生成比较慢，请保持页面打开</p>
+          </div>
+        </div>
+      </motion.section>
+    </motion.div>
+  );
+}
 
-              <button type="button" className="share-faces-entry" onClick={() => { setView("faces"); setError(""); }} data-uisfx="open" data-analytics-action="faces_open">
-                <span className="share-faces-entry-icon"><ImagesSquare weight="bold" /></span>
-                <span><strong>保存 9 张透明图片</strong><small>查看平铺列表，可批量或逐张保存</small></span>
-                <ArrowRight weight="bold" />
-              </button>
+function QrShareBubble({job, onClose}) {
+  const reduceMotion = useReducedMotion();
+  const [qrDataUrl, setQrDataUrl] = useState("");
+  const shareUrl = useMemo(() => shareUrlForJob(job), [job.id, job.pageUrl]);
+  const avatarUrl = job.avatars?.[0]?.src || "";
 
-              <div className="share-qr-preview">
-                {qrDataUrl ? <img src={qrDataUrl} alt="分享二维码" /> : <span className="share-qr-skeleton" aria-label="正在生成分享二维码" />}
-              </div>
+  useEffect(() => {
+    let active = true;
+    void buildQrCodeDataUrl(shareUrl, avatarUrl)
+      .then((value) => { if (active) setQrDataUrl(value); })
+      .catch(() => { if (active) setQrDataUrl(""); });
+    return () => { active = false; };
+  }, [avatarUrl, shareUrl]);
 
-              <div className="share-sheet-actions">
-                <a className={`share-action-button share-action-primary ${qrDataUrl ? "" : "is-disabled"}`} href={qrDataUrl || undefined} download={`${safeFilenamePart(job.title)}-分享二维码.png`} aria-disabled={!qrDataUrl} data-uisfx={qrDataUrl ? "success" : "blocked"} data-analytics-action="qr_save"><DownloadSimple weight="bold" />保存二维码</a>
-                <button type="button" className="share-action-button share-action-secondary" onClick={copyLink} data-analytics-action="link_copy"><CopySimple weight="bold" />{copyState || "复制链接"}</button>
-              </div>
+  useEffect(() => {
+    const onKeyDown = (event) => { if (event.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
 
-              {error ? <p className="share-sheet-error">{error}</p> : null}
-              <button type="button" className="share-save-video" onClick={saveVideo} data-uisfx="start" data-analytics-action="video_generate" disabled={submitting}>{submitting ? "正在打开视频生成" : "还想保存视频？生成视频"}<ArrowRight weight="bold" /></button>
-            </motion.div>
-          )}
-        </AnimatePresence>
+  return (
+    <motion.div className="qr-bubble-layer" initial={reduceMotion ? false : {opacity: 0}} animate={{opacity: 1}} exit={{opacity: 0}} onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      <motion.section
+        className="qr-share-bubble"
+        initial={reduceMotion ? false : {opacity: 0, y: 24, scale: 0.78}}
+        animate={{opacity: 1, y: 0, scale: 1}}
+        exit={reduceMotion ? {opacity: 0} : {opacity: 0, y: 16, scale: 0.86}}
+        transition={{type: "spring", stiffness: 360, damping: 25}}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="qr-share-title"
+      >
+        <button type="button" className="qr-bubble-close" onClick={onClose} data-uisfx="close" data-analytics-action="qr_close" aria-label="关闭分享二维码"><X weight="bold" /></button>
+        <h2 id="qr-share-title">分享这个作品</h2>
+        <p>长按二维码保存，发给朋友就能打开互动页</p>
+        <div className="qr-bubble-image">
+          {qrDataUrl ? (
+            <a href={qrDataUrl} download={`${safeFilenamePart(job.title)}-分享二维码.png`} data-uisfx="success" data-analytics-action="qr_save" aria-label="保存带作品表情的分享二维码">
+              <img src={qrDataUrl} alt={`${job.title}作品分享二维码，中间是作品表情`} draggable="false" />
+            </a>
+          ) : <span className="share-qr-skeleton" aria-label="正在生成分享二维码" />}
+        </div>
       </motion.section>
     </motion.div>
   );
@@ -989,8 +1049,28 @@ function LocalVideoRenderPage({job, appearance, onBack}) {
 
 function SharedJobExperience({job, onExit, onRender, embedded = false}) {
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
+  const [copyState, setCopyState] = useState("");
   const [appearance, setAppearance] = useState(job.appearance || defaultAppearance);
+  const copyTimer = useRef(null);
+  const shareUrl = useMemo(() => shareUrlForJob(job), [job.id, job.pageUrl]);
   const closeSheet = useCallback(() => setSheetOpen(false), []);
+  const closeQr = useCallback(() => setQrOpen(false), []);
+
+  useEffect(() => () => window.clearTimeout(copyTimer.current), []);
+
+  const copyShareLink = async () => {
+    try {
+      await copyText(shareUrl);
+      setCopyState("已复制");
+      playUISfx("copy");
+    } catch {
+      setCopyState("复制失败");
+      playUISfx("error");
+    }
+    window.clearTimeout(copyTimer.current);
+    copyTimer.current = window.setTimeout(() => setCopyState(""), 1800);
+  };
 
   return (
     <>
@@ -1002,19 +1082,38 @@ function SharedJobExperience({job, onExit, onRender, embedded = false}) {
         onAppearanceChange={setAppearance}
         lookCount={9}
         onExit={onExit}
-        onSettings={() => setSheetOpen(true)}
+        actionContent={(
+          <>
+            <button type="button" className="experience-share-action" onClick={copyShareLink} data-analytics-action="link_copy" aria-label="复制作品链接">
+              <CopySimple weight="bold" aria-hidden="true" />
+              <span className="experience-action-label-full">{copyState || "复制链接"}</span>
+              <span className="experience-action-label-short">{copyState || "复制"}</span>
+            </button>
+            <button type="button" className="experience-share-action" onClick={() => { setQrOpen(false); setSheetOpen(true); }} data-uisfx="open" data-analytics-action="faces_open" aria-label="打开保存图片半弹窗">
+              <ImagesSquare weight="bold" aria-hidden="true" />
+              <span className="experience-action-label-full">保存图片</span>
+              <span className="experience-action-label-short">保存</span>
+            </button>
+            <button type="button" className="experience-share-action" onClick={() => { setSheetOpen(false); setQrOpen((value) => !value); }} data-uisfx="open" data-analytics-action="qr_open" aria-label="打开分享二维码">
+              <QrCode weight="bold" aria-hidden="true" />
+              <span className="experience-action-label-full">分享二维码</span>
+              <span className="experience-action-label-short">二维码</span>
+            </button>
+          </>
+        )}
         embedded={embedded}
         showIntro={!embedded}
       />
       <AnimatePresence>
         {sheetOpen ? (
-          <ShareSettingsSheet
+          <SaveImagesSheet
             job={job}
             appearance={appearance}
             onClose={closeSheet}
             onRender={onRender}
           />
         ) : null}
+        {qrOpen ? <QrShareBubble job={job} onClose={closeQr} /> : null}
       </AnimatePresence>
     </>
   );

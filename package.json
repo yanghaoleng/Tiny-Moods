@@ -8,6 +8,7 @@
     "dev:ui": "vite",
     "dev:demo": "GENERATOR_DEMO_MODE=1 SKIP_VIDEO_RENDER=1 node server/index.mjs",
     "build": "vite build",
+    "images:optimize": "node scripts/optimize-static-images.mjs",
     "start": "NODE_ENV=production node server/index.mjs",
     "preview": "vite preview",
     "remotion:studio": "remotion studio src/remotion/index.jsx",

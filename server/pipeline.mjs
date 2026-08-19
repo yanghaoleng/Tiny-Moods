@@ -83,7 +83,8 @@ export const getSeedreamBuffer = async (sourceBuffer) => {
 
 export const buildAvatarManifest = (jobId, title, _publicOrigin, themes = fallbackPalette) => themes.map((theme, index) => ({
   ...theme,
-  src: `/generated/${jobId}/face-${String(index + 1).padStart(2, "0")}.png`,
+  src: `/generated/${jobId}/face-${String(index + 1).padStart(2, "0")}.webp`,
+  downloadSrc: `/generated/${jobId}/face-${String(index + 1).padStart(2, "0")}.png`,
   label: `${title} 表情 ${index + 1}`,
 }));
 

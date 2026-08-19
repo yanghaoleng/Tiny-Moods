@@ -5,7 +5,7 @@
 | 首页 / 落地页 | 生成器入口 | `Landing` / `.generator-page` |
 | 首页大标题 / 随机文案 | 11 句随机 Typer 波浪主标题，点击换一句；空间不足时从逗号后换行并隐藏行尾逗号 | `landingHeadlines` / `headline` / `showNextHeadline` / `TyperHeadline` / `wrapped` / `.typer-headline-button` / `.typer-flow` / `.typer-phrase` / `.typer-comma` |
 | 黑色鼠标 / 放大指针 | 桌面端 37px 自定义实心指针，按下位移 2px | `EmotionCursorTrail` / `.emotion-cursor` |
-| Tiny Moods Logo / 九格拍立得 Logo | 品牌按钮和相机图标 | `BrandButton` / `app-icon.png` |
+| Tiny Moods Logo / 九格拍立得 Logo | 品牌按钮和相机图标 | `BrandButton` / `app-icon.webp` |
 | 随机相机图标 / 点一下换相机 | 导航左侧保留的 9 个扁平透明相机；进入随机，点击品牌切换且不连续重复 | `CameraIcon` / `cameraIconConcepts` / `createCameraIconVariant` / `createInitialCameraIconVariant` / `tiny-moods:camera-icon` / `.camera-icon-*` |
 | 图标生成参考稿 | 9 个图像生成方向的原始探索图，不直接用于页面透明图标 | `output/icon-concepts/flat-camera-generated/` |
 | App Icon 旁边的文字 / 网页标题 | 英文动态品牌字标 `Tiny Moods` | `BrandButton` / `.brand-glyph-bar` / `.brand-glyph` |
@@ -29,21 +29,23 @@
 | 在用户电脑上拆图 | 浏览器拆格与抠白底 | `localMatting.js` / `matting.worker.js` |
 | 制作进度页 | 图片生成状态 | `JobStatus` |
 | 互动页 | 永久作品体验 | `SharedJobExperience` / `JennieExperience` |
-| 分享设置浮窗 | 九图入口、纯二维码、复制链接和视频入口 | `ShareSettingsSheet` / `view="share"` |
-| 保存 9 张透明图片 / 九图入口 | 打开透明图平铺保存页 | `.share-faces-entry` / `setView("faces")` |
+| 底部三个分享按钮 / 放在外面的按钮 | 复制链接、保存图片、分享二维码三个直接入口 | `actionContent` / `.experience-share-action` / `link_copy` / `faces_open` / `qr_open` |
+| 保存图片半弹窗 | 从页面底部打开的九图保存层 | `SaveImagesSheet` / `.share-sheet` / `sheetOpen` |
+| 保存 9 张透明图片 / 九图入口 | 打开透明图平铺保存页 | `.experience-share-action` / `setSheetOpen(true)` |
 | 九图平铺 / 九张列表 | 3×3 透明原图网格 | `.share-face-grid` / `.share-face-item` |
 | 一键保存 9 张 | 手机系统多图保存，电脑 ZIP 单文件下载 | `saveAllFaces` / `prepareAvatarFiles` / `downloadFilesAsZip` / `.share-save-all` |
 | 背景开关 | 互动页顶部的彩色/纯白切换 | `.experience-display-controls` / `backgroundMode` / `patternStyle` |
 | 装饰开关 | 互动页顶部的贴纸显示切换 | `.experience-display-controls` / `decorations` / `stickerSlots` |
-| 主页图标 | 互动页底部返回主页入口 | `.experience-home` / `app-icon.png` / `onExit` |
-| 保存视频 | 进入浏览器本机渲染 | `.share-save-video` / `?render=1` |
+| 主页图标 / 小房子 | 互动页左上角返回主页入口 | `.experience-top-actions` / `.experience-home` / `House` / `onExit` |
+| 背景音乐开关 | 互动页左上角的 BGM 播放与暂停 | `.experience-bgm-toggle` / `musicEnabled` / `audioPlaying` / `toggleMusic` |
+| 保存视频 | 保存图片半弹窗底部的本机渲染入口 | `.share-video-section` / `.share-save-video` / `?render=1` |
 | 渲染进度页 | 本机视频生成状态 | `LocalVideoRenderPage` |
 | 本机渲染器 | 按需加载 Remotion Web Renderer | `localVideoRender.js` / `renderVideoLocally` |
 | 再次下载视频 | Blob 下载兜底按钮 | `triggerDownload` |
 | 访客再生成视频 | 分享访客本机反复渲染 | `LocalVideoRenderPage`，不调用服务端渲染接口 |
 | 永久链接 | 作品或 DEMO 地址 | `?view=:id` / `?demo=:id` |
-| 分享二维码 / 纯二维码 | 无标题、头像和说明的 1080×1080 永久链接码 | `qrcode` / `buildQrCodeDataUrl` / `.share-qr-preview` |
-| 视频次按钮 | 分享面板内弱化的视频入口 | `.share-save-video` |
+| 分享二维码 / 表情二维码 | 中间带该作品表情、支持长按保存的 1080×1080 永久链接码 | `QrShareBubble` / `buildQrCodeDataUrl` / `.qr-share-bubble` / `.qr-bubble-image` |
+| 视频测试提示 | 保存视频按钮下的速度说明 | `.share-video-section > p` |
 | 团子示例 | 团子九表情互动页 | `?demo=tuanzi` / `tuanziAvatars` |
 | Jennie 示例 | 由永久作品 `cec29c58067e4bdc9b6c197b540e7b74` 同步的互动页 | `?demo=jennie` / `featuredJennieAvatars` |
 | 耙耙柑 / 小太阳 | 鹦鹉互动页 | `?demo=sun-conure` / `sunConureAvatars` |
@@ -52,8 +54,10 @@
 | 大头 | 主交互透明主体 | `.portrait` / `avatar` |
 | 人物白边 | Alpha 通道描边 | `.portrait` 的 `drop-shadow` |
 | 波纹 | 半调点阵高亮扩散 | `HalftoneRippleBackground` |
-| 自动慢慢换一个 | 自动换装计时器 | `AUTO_CHANGE_INTERVAL` |
-| 播放按钮 | BGM 自动播放回退 | `.audio-start` |
+| 自动慢慢换一个 / Hover 不打断 | 独立于悬停状态的自动换装计时器 | `AUTO_CHANGE_INTERVAL` / `changeLook`；头像按钮无 `whileHover` |
+| 立即播放音乐 / 首次点击补播 | BGM 自动播放与浏览器策略回退 | `autoPlay` / `preload="auto"` / `tryStartAudio` |
+| WebP 预览 / PNG 原图 | 互动浏览走压缩图，保存走透明原图 | `avatar.src` / `avatar.downloadSrc` / `writeFacePreview` |
+| 全部图片压缩 | 静态 PNG 批量转 WebP | `npm run images:optimize` / `scripts/optimize-static-images.mjs` |
 | 按钮音效 / 电影感音效 | UI SFX `10 Cinematic` 语义音效层 | `uiSfx` / `playUISfx` / `data-uisfx` |
 | 声音开关 / 静音按钮 | 全站界面音效开关 | `UISoundToggle` / `.ui-sfx-toggle` / `9face:ui-sfx` |
 | 大黑鼠标 / 情绪词轨迹 | 桌面自定义指针与无重叠彩色情绪标签拖尾 | `EmotionCursorTrail` / `.emotion-cursor` / `.emotion-trail-badge` |

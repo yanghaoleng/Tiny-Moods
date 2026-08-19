@@ -1,24 +1,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Ghost } from "@phosphor-icons/react/Ghost";
-import { MusicNotes } from "@phosphor-icons/react/MusicNotes";
-import { SlidersHorizontal } from "@phosphor-icons/react/SlidersHorizontal";
+import { House } from "@phosphor-icons/react/House";
+import { SpeakerHigh } from "@phosphor-icons/react/SpeakerHigh";
+import { SpeakerSlash } from "@phosphor-icons/react/SpeakerSlash";
 import HalftoneRippleBackground from "./HalftoneRippleBackground";
 import UISoundToggle from "./UISoundToggle";
 
-import avatar02 from "../assets/image 2-1.png";
-import avatar03 from "../assets/image 3.png";
-import avatar04 from "../assets/image 3-1.png";
-import avatar05 from "../assets/image 4.png";
-import avatar06 from "../assets/image 4-1.png";
-import avatar07 from "../assets/image 4-2.png";
-import avatar08 from "../assets/image 4-3.png";
-import avatar09 from "../assets/image 5.png";
-import avatar10 from "../assets/image 5-1.png";
-import avatar11 from "../assets/image 6.png";
+import avatar02 from "../assets/image 2-1.webp";
+import avatar03 from "../assets/image 3.webp";
+import avatar04 from "../assets/image 3-1.webp";
+import avatar05 from "../assets/image 4.webp";
+import avatar06 from "../assets/image 4-1.webp";
+import avatar07 from "../assets/image 4-2.webp";
+import avatar08 from "../assets/image 4-3.webp";
+import avatar09 from "../assets/image 5.webp";
+import avatar10 from "../assets/image 5-1.webp";
+import avatar11 from "../assets/image 6.webp";
 
 export const jennieAvatars = [
-  { src: `${import.meta.env.BASE_URL}hero.png`, accent: "#ef6f9a", deep: "#8f2851", bg: "#ffd9e7", label: "苹果花苞 Jennie" },
+  { src: `${import.meta.env.BASE_URL}hero.webp`, accent: "#ef6f9a", deep: "#8f2851", bg: "#ffd9e7", label: "苹果花苞 Jennie" },
   { src: avatar02, accent: "#e7587f", deep: "#7f2544", bg: "#ffcfdc", label: "波点蝴蝶结 Jennie" },
   { src: avatar03, accent: "#df8b42", deep: "#74401c", bg: "#ffe0b8", label: "嘴巴嘟嘟 Jennie" },
   { src: avatar04, accent: "#6b96c7", deep: "#25486f", bg: "#d7e9ff", label: "墨镜酷酷 Jennie" },
@@ -35,11 +36,11 @@ const stickerImages = [
   "sparkle", "heart", "flower", "butterfly",
   "cherries", "music", "crown", "wand",
   "camera", "planet", "cookie", "balloon",
-].map((name) => `${import.meta.env.BASE_URL}decorations/doodle-${name}.png`);
+].map((name) => `${import.meta.env.BASE_URL}decorations/doodle-${name}.webp`);
 
 const scribbleImages = Array.from(
   {length: 12},
-  (_, index) => `${import.meta.env.BASE_URL}decorations/crayon-scribble-${String(index + 1).padStart(2, "0")}.png`,
+  (_, index) => `${import.meta.env.BASE_URL}decorations/crayon-scribble-${String(index + 1).padStart(2, "0")}.webp`,
 );
 
 const decorationArt = {
@@ -137,7 +138,7 @@ export default function JennieExperience({
   bgmUrl = `${import.meta.env.BASE_URL}jenniebgm.mp3`,
   videoUrl,
   onExit,
-  onSettings,
+  actionContent,
   onAppearanceChange,
   embedded = false,
   showIntro = true,
@@ -150,7 +151,8 @@ export default function JennieExperience({
   const [baseThemeLook, setBaseThemeLook] = useState(0);
   const [themeWipe, setThemeWipe] = useState(null);
   const [imageFailed, setImageFailed] = useState(false);
-  const [needsAudioStart, setNeedsAudioStart] = useState(false);
+  const [musicEnabled, setMusicEnabled] = useState(true);
+  const [audioPlaying, setAudioPlaying] = useState(false);
   const [introVisible, setIntroVisible] = useState(showIntro);
   const rippleId = useRef(0);
   const lookRef = useRef(0);
@@ -165,11 +167,11 @@ export default function JennieExperience({
   const stickers = useMemo(() => buildStickers(look), [look]);
 
   useEffect(() => {
-    avatarSet.forEach(({ src }) => {
-      const img = new Image();
-      img.src = src;
-    });
-  }, [avatarSet]);
+    const nextAvatar = avatarSet[((look + 1) * 7) % avatarSet.length];
+    const img = new Image();
+    img.decoding = "async";
+    img.src = nextAvatar.src;
+  }, [avatarSet, look]);
 
   useEffect(() => {
     const themeMeta = document.querySelector('meta[name="theme-color"]');
@@ -194,23 +196,50 @@ export default function JennieExperience({
 
   const tryStartAudio = useCallback(async () => {
     const audio = audioRef.current;
-    if (!audio) return;
+    if (!audio || !musicEnabled) return false;
 
     try {
       await audio.play();
-      setNeedsAudioStart(false);
+      setAudioPlaying(true);
+      return true;
     } catch {
-      setNeedsAudioStart(true);
+      setAudioPlaying(false);
+      return false;
     }
-  }, []);
+  }, [musicEnabled]);
 
   useEffect(() => {
-    const audioTimer = window.setTimeout(() => {
-      void tryStartAudio();
-    }, reduceMotion ? 0 : 3200);
+    void tryStartAudio();
+  }, [bgmUrl, tryStartAudio]);
 
-    return () => window.clearTimeout(audioTimer);
-  }, [reduceMotion, tryStartAudio]);
+  useEffect(() => {
+    if (!musicEnabled || audioPlaying) return undefined;
+    const unlockAudio = () => void tryStartAudio();
+    window.addEventListener("pointerdown", unlockAudio, {capture: true, once: true});
+    window.addEventListener("keydown", unlockAudio, {capture: true, once: true});
+    return () => {
+      window.removeEventListener("pointerdown", unlockAudio, true);
+      window.removeEventListener("keydown", unlockAudio, true);
+    };
+  }, [audioPlaying, musicEnabled, tryStartAudio]);
+
+  const toggleMusic = useCallback(async () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (audioPlaying) {
+      audio.pause();
+      setMusicEnabled(false);
+      setAudioPlaying(false);
+      return;
+    }
+    setMusicEnabled(true);
+    try {
+      await audio.play();
+      setAudioPlaying(true);
+    } catch {
+      setAudioPlaying(false);
+    }
+  }, [audioPlaying]);
 
   const changeLook = useCallback((event) => {
     const id = rippleId.current + 1;
@@ -270,9 +299,11 @@ export default function JennieExperience({
       <audio
         ref={audioRef}
         src={bgmUrl}
+        autoPlay
         loop
-        preload="none"
-        onPlay={() => setNeedsAudioStart(false)}
+        preload="auto"
+        onPlay={() => setAudioPlaying(true)}
+        onPause={() => setAudioPlaying(false)}
       />
       <AnimatePresence>
         {introVisible ? (
@@ -304,6 +335,26 @@ export default function JennieExperience({
           transitionDuration={THEME_TRANSITION_DURATION}
           reduceMotion={reduceMotion}
         />
+        <div className="experience-top-actions" aria-label="互动页快捷设置">
+          {onExit ? (
+            <button type="button" className="experience-top-button experience-home" onClick={onExit} data-uisfx="back" data-analytics-action="home" aria-label="返回主页">
+              <House weight="fill" aria-hidden="true" />
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="experience-top-button experience-bgm-toggle"
+            role="switch"
+            aria-checked={audioPlaying}
+            aria-label={audioPlaying ? "关闭背景音乐" : "播放背景音乐"}
+            data-uisfx={audioPlaying ? "toggle-off" : "toggle-on"}
+            data-analytics-action={audioPlaying ? "audio_pause" : "audio_play"}
+            onClick={toggleMusic}
+          >
+            {audioPlaying ? <SpeakerHigh weight="fill" aria-hidden="true" /> : <SpeakerSlash weight="fill" aria-hidden="true" />}
+            <span>音乐</span>
+          </button>
+        </div>
         {onAppearanceChange ? (
           <div className="experience-display-controls" aria-label="互动页显示设置">
             <button
@@ -368,7 +419,6 @@ export default function JennieExperience({
               onClick={changeLook}
               data-uisfx="skip-next"
               data-analytics-action="look_change"
-              whileHover={reduceMotion ? undefined : { scale: 1.025, rotate: 1.5 }}
               whileTap={reduceMotion ? undefined : { scale: 0.91, rotate: -4 }}
               transition={{ type: "spring", stiffness: 420, damping: 18 }}
               aria-label={`当前是第 ${look + 1} 个造型，${avatar.label}。点击可以立即换一个造型。`}
@@ -391,6 +441,7 @@ export default function JennieExperience({
                     src={avatar.src}
                     alt={avatar.label}
                     fetchPriority="high"
+                    decoding="async"
                     draggable="false"
                     onError={() => setImageFailed(true)}
                     initial={
@@ -421,48 +472,18 @@ export default function JennieExperience({
 
         </section>
 
-        <AnimatePresence>
-          {needsAudioStart ? (
-            <motion.button
-              type="button"
-              className="audio-start"
-              onClick={tryStartAudio}
-              data-uisfx="play"
-              data-analytics-action="audio_play"
-              initial={reduceMotion ? false : { opacity: 0, y: 16, scale: 0.92 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 10, scale: 0.94 }}
-              transition={{ type: "spring", stiffness: 360, damping: 24, delay: reduceMotion ? 0 : 0.2 }}
-              aria-label="播放背景音乐"
-            >
-              <MusicNotes weight="fill" aria-hidden="true" />
-              <span>播放音乐</span>
-            </motion.button>
-          ) : null}
-        </AnimatePresence>
-
         {appearance.decorations ? <div className="corner-note" aria-hidden="true">
           <img src={decorationArt.corner} alt="" />
           <span>{cornerText}</span>
         </div> : null}
-        {onExit || videoUrl || onSettings ? (
+        {videoUrl || actionContent ? (
           <div className="experience-actions" aria-label="互动页操作">
-            {onExit ? (
-              <button type="button" className="experience-exit experience-home" onClick={onExit} data-uisfx="back" data-analytics-action="home" aria-label="返回主页">
-                <img src={`${import.meta.env.BASE_URL}app-icon.png`} alt="" />
-              </button>
-            ) : null}
             {videoUrl ? (
               <a className="experience-download" href={videoUrl} download data-uisfx="success" data-analytics-action="video_download_legacy">
                 下载视频
               </a>
             ) : null}
-            {onSettings ? (
-              <button type="button" className="experience-settings" onClick={onSettings} data-uisfx="open" data-analytics-action="share_open">
-                <SlidersHorizontal weight="bold" aria-hidden="true" />
-                分享设置
-              </button>
-            ) : null}
+            {actionContent}
             {!embedded ? <UISoundToggle className="experience-sfx" /> : null}
           </div>
         ) : null}

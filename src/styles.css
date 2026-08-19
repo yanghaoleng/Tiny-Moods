@@ -66,7 +66,8 @@ button {
 
 .stage.is-embedded .halftone-ripple-background,
 .stage.is-embedded .experience-intro,
-.stage.is-embedded .experience-actions {
+.stage.is-embedded .experience-actions,
+.stage.is-embedded .experience-top-actions {
   position: absolute;
 }
 
@@ -78,8 +79,8 @@ button {
 .stage.is-embedded .experience-display-controls {
   position: absolute;
   top: 14px;
-  left: 14px;
-  translate: 0;
+  left: 50%;
+  translate: -50% 0;
 }
 
 .stage.is-embedded .experience-intro-copy {
@@ -162,6 +163,43 @@ button {
   background: color-mix(in srgb, var(--page-bg) 74%, white);
   box-shadow: 0 4px 0 color-mix(in srgb, var(--accent-deep) 16%, transparent);
   translate: -50% 0;
+}
+
+.experience-top-actions {
+  position: fixed;
+  top: max(16px, env(safe-area-inset-top));
+  left: max(16px, env(safe-area-inset-left));
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.experience-top-button {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 13px;
+  border: 2px solid rgb(255 255 255 / 0.88);
+  border-radius: 999px;
+  color: var(--accent-deep);
+  background: color-mix(in srgb, var(--page-bg) 74%, white);
+  box-shadow: 0 4px 0 color-mix(in srgb, var(--accent-deep) 16%, transparent);
+  font-size: 0.78rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.experience-top-button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.experience-top-button.experience-home {
+  width: 42px;
+  padding: 0;
 }
 
 .experience-display-toggle {
@@ -388,6 +426,7 @@ button {
 .experience-exit,
 .experience-download,
 .experience-settings,
+.experience-share-action,
 .experience-sfx {
   position: relative;
   min-height: 42px;
@@ -401,20 +440,6 @@ button {
   font-weight: 900;
   cursor: pointer;
   text-decoration: none;
-}
-
-.experience-home {
-  display: inline-grid;
-  width: 42px;
-  padding: 0;
-  place-items: center;
-}
-
-.experience-home img {
-  display: block;
-  width: 27px;
-  height: 27px;
-  object-fit: contain;
 }
 
 .experience-actions {
@@ -443,6 +468,21 @@ button {
   gap: 7px;
 }
 
+.experience-share-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.experience-share-action svg {
+  width: 17px;
+  height: 17px;
+}
+
+.experience-action-label-short { display: none; }
+
 .experience-sfx {
   display: inline-grid;
   width: 42px;
@@ -464,7 +504,9 @@ button {
 .stage.background-white .experience-exit,
 .stage.background-white .experience-download,
 .stage.background-white .experience-settings,
+.stage.background-white .experience-share-action,
 .stage.background-white .experience-sfx,
+.stage.background-white .experience-top-button,
 .stage.background-white .experience-display-controls,
 .stage.background-white .audio-start {
   border-color: rgb(0 0 0 / 0.72);
@@ -492,7 +534,9 @@ button {
 .experience-exit:active,
 .experience-download:active,
 .experience-settings:active,
+.experience-share-action:active,
 .experience-sfx:active,
+.experience-top-button:active,
 .experience-display-toggle:active {
   transform: scale(0.96);
 }
@@ -500,7 +544,9 @@ button {
 .experience-exit:focus-visible,
 .experience-download:focus-visible,
 .experience-settings:focus-visible,
+.experience-share-action:focus-visible,
 .experience-sfx:focus-visible,
+.experience-top-button:focus-visible,
 .experience-display-toggle:focus-visible {
   outline: 3px solid var(--accent-deep);
   outline-offset: 3px;
@@ -513,7 +559,30 @@ button {
 
   .experience-display-controls {
     top: max(12px, env(safe-area-inset-top));
+    right: max(12px, env(safe-area-inset-right));
+    left: auto;
+    translate: 0;
   }
+
+  .stage.is-embedded .experience-display-controls {
+    right: 12px;
+    left: auto;
+    translate: 0;
+  }
+
+  .experience-top-actions {
+    top: max(12px, env(safe-area-inset-top));
+    left: max(12px, env(safe-area-inset-left));
+    gap: 6px;
+  }
+
+  .experience-top-button {
+    min-height: 38px;
+    padding: 6px 9px;
+    font-size: 0.7rem;
+  }
+
+  .experience-top-button.experience-home { width: 38px; }
 
   .experience-display-toggle {
     gap: 6px;
@@ -562,6 +631,7 @@ button {
   .experience-exit,
   .experience-download,
   .experience-settings,
+  .experience-share-action,
   .experience-sfx {
     min-height: 40px;
     padding: 7px 14px;
@@ -573,10 +643,15 @@ button {
     padding: 0;
   }
 
-  .experience-home {
-    width: 40px;
-    padding: 0;
+  .experience-share-action {
+    min-width: 61px;
+    padding: 7px 9px;
+    gap: 4px;
+    font-size: 0.72rem;
   }
+
+  .experience-action-label-full { display: none; }
+  .experience-action-label-short { display: inline; }
 
 }
 

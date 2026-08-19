@@ -10,20 +10,20 @@ import {
   useVideoConfig,
 } from "remotion";
 
-import avatar02 from "../../assets/image 2-1.png";
-import avatar03 from "../../assets/image 3.png";
-import avatar04 from "../../assets/image 3-1.png";
-import avatar05 from "../../assets/image 4.png";
-import avatar06 from "../../assets/image 4-1.png";
-import avatar07 from "../../assets/image 4-2.png";
-import avatar08 from "../../assets/image 4-3.png";
-import avatar09 from "../../assets/image 5.png";
-import avatar10 from "../../assets/image 5-1.png";
-import avatar11 from "../../assets/image 6.png";
+import avatar02 from "../../assets/image 2-1.webp";
+import avatar03 from "../../assets/image 3.webp";
+import avatar04 from "../../assets/image 3-1.webp";
+import avatar05 from "../../assets/image 4.webp";
+import avatar06 from "../../assets/image 4-1.webp";
+import avatar07 from "../../assets/image 4-2.webp";
+import avatar08 from "../../assets/image 4-3.webp";
+import avatar09 from "../../assets/image 5.webp";
+import avatar10 from "../../assets/image 5-1.webp";
+import avatar11 from "../../assets/image 6.webp";
 import {INTRO_FRAMES, LOOK_COUNT, LOOK_FRAMES} from "./config";
 
 const defaultAvatars = [
-  {src: staticFile("hero.png"), accent: "#ef6f9a", deep: "#8f2851", bg: "#ffd9e7", label: "苹果花苞 Jennie"},
+  {src: staticFile("hero.webp"), accent: "#ef6f9a", deep: "#8f2851", bg: "#ffd9e7", label: "苹果花苞 Jennie"},
   {src: avatar02, accent: "#e7587f", deep: "#7f2544", bg: "#ffcfdc", label: "波点蝴蝶结 Jennie"},
   {src: avatar03, accent: "#df8b42", deep: "#74401c", bg: "#ffe0b8", label: "嘴巴嘟嘟 Jennie"},
   {src: avatar04, accent: "#6b96c7", deep: "#25486f", bg: "#d7e9ff", label: "墨镜酷酷 Jennie"},
@@ -40,11 +40,11 @@ const stickerImages = [
   "sparkle", "heart", "flower", "butterfly",
   "cherries", "music", "crown", "wand",
   "camera", "planet", "cookie", "balloon",
-].map((name) => staticFile(`decorations/doodle-${name}.png`));
+].map((name) => staticFile(`decorations/doodle-${name}.webp`));
 
 const scribbleImages = Array.from(
   {length: 12},
-  (_, index) => staticFile(`decorations/crayon-scribble-${String(index + 1).padStart(2, "0")}.png`),
+  (_, index) => staticFile(`decorations/crayon-scribble-${String(index + 1).padStart(2, "0")}.webp`),
 );
 
 const decorationArt = {

@@ -61,6 +61,28 @@ const defaultAppearance = Object.freeze({
   patternStyle: "dots",
   decorations: true,
 });
+const faceFilename = (directory, index, extension) => path.join(
+  directory,
+  `face-${String(index).padStart(2, "0")}.${extension}`,
+);
+const writeFacePreview = async (input, output) => sharp(input)
+  .ensureAlpha()
+  .resize(960, 960, {
+    fit: "contain",
+    withoutEnlargement: true,
+    background: {r: 0, g: 0, b: 0, alpha: 0},
+  })
+  .webp({quality: 88, alphaQuality: 100, effort: 5, smartSubsample: true})
+  .toFile(output);
+const ensureFacePreview = async (directory, index) => {
+  const preview = faceFilename(directory, index, "webp");
+  try {
+    await stat(preview);
+  } catch {
+    await writeFacePreview(faceFilename(directory, index, "png"), preview);
+  }
+  return preview;
+};
 const demoProfiles = [
   {
     id: "jennie",
@@ -105,9 +127,11 @@ const publicJob = (job) => {
     ? `demo-${job.demoAssetsVersion}`
     : String(job.assetRevision || job.createdAt || "1");
   if (Array.isArray(safe.avatars)) {
+    const withAssetRevision = (src) => `${src}${src.includes("?") ? "&" : "?"}v=${encodeURIComponent(assetRevision)}`;
     safe.avatars = safe.avatars.map((avatar) => ({
       ...avatar,
-      src: `${avatar.src}${avatar.src.includes("?") ? "&" : "?"}v=${encodeURIComponent(assetRevision)}`,
+      src: withAssetRevision(avatar.src),
+      ...(avatar.downloadSrc ? {downloadSrc: withAssetRevision(avatar.downloadSrc)} : {}),
     }));
   }
   return safe;
@@ -231,12 +255,15 @@ const restoreState = async () => {
         job.expiresAt = null;
       }
       if (job.avatars?.length === 9) {
+        const directory = path.join(generatedRoot, job.id);
+        await Promise.all(Array.from({length: 9}, (_, index) => ensureFacePreview(directory, index + 1)));
         delete job.videoUrl;
         delete job.renderError;
         job.videoStatus = "local";
         job.avatars = job.avatars.map((avatar, index) => ({
           ...avatar,
-          src: `/generated/${job.id}/face-${String(index + 1).padStart(2, "0")}.png`,
+          src: `/generated/${job.id}/face-${String(index + 1).padStart(2, "0")}.webp`,
+          downloadSrc: `/generated/${job.id}/face-${String(index + 1).padStart(2, "0")}.png`,
           label: `${job.title} 表情 ${index + 1}`,
         }));
         job.pageUrl = `/?view=${job.id}`;
@@ -264,15 +291,17 @@ const ensureDemoJobs = async () => {
     const id = `demo-${profile.id}`;
     const directory = path.join(generatedRoot, id);
     const existing = jobs.get(id);
-    const demoAssetsVersion = 4;
+    const demoAssetsVersion = 5;
     await mkdir(directory, {recursive: true});
     const facePaths = [];
     for (let index = 0; index < profile.sources.length; index += 1) {
-      const target = path.join(directory, `face-${String(index + 1).padStart(2, "0")}.png`);
+      const target = faceFilename(directory, index + 1, "png");
+      const preview = faceFilename(directory, index + 1, "webp");
       facePaths.push(target);
       try {
         if (existing?.demoAssetsVersion !== demoAssetsVersion) throw new Error("refresh demo assets");
         await stat(target);
+        await stat(preview);
       } catch {
         await sharp(profile.sources[index])
           .ensureAlpha()
@@ -283,6 +312,7 @@ const ensureDemoJobs = async () => {
           })
           .png({compressionLevel: 9, adaptiveFiltering: true})
           .toFile(target);
+        await writeFacePreview(target, preview);
       }
     }
     const themes = await Promise.all(facePaths.map(getImageTheme));
@@ -663,6 +693,7 @@ app.post("/api/jobs/:id/faces", faceUpload.array("faces", 9), async (request, re
   const directory = path.join(generatedRoot, job.id);
   try {
     for (let index = 0; index < 9; index += 1) {
+      const original = faceFilename(directory, index + 1, "png");
       await sharp(request.files[index].buffer)
         .ensureAlpha()
         .resize(1365, 1365, {
@@ -671,7 +702,8 @@ app.post("/api/jobs/:id/faces", faceUpload.array("faces", 9), async (request, re
           background: {r: 0, g: 0, b: 0, alpha: 0},
         })
         .png({compressionLevel: 9, adaptiveFiltering: true})
-        .toFile(path.join(directory, `face-${String(index + 1).padStart(2, "0")}.png`));
+        .toFile(original);
+      await writeFacePreview(original, faceFilename(directory, index + 1, "webp"));
     }
     const facePaths = Array.from({length: 9}, (_, index) => path.join(directory, `face-${String(index + 1).padStart(2, "0")}.png`));
     const themes = await Promise.all(facePaths.map(getImageTheme));
@@ -709,8 +741,8 @@ app.post("/api/public/jobs/:id/renders", async (request, response) => {
 
 app.get("/generated/:id/:filename", (request, response) => {
   if (!jobs.has(request.params.id)) return response.status(404).end();
-  if (!/^(?:face-\d{2}\.png|video\.mp4)$/.test(request.params.filename)) return response.status(404).end();
-  response.setHeader("Cache-Control", request.params.filename === "video.mp4" ? "private, no-cache" : "private, max-age=3600");
+  if (!/^(?:face-\d{2}\.(?:png|webp)|video\.mp4)$/.test(request.params.filename)) return response.status(404).end();
+  response.setHeader("Cache-Control", request.params.filename === "video.mp4" ? "private, no-cache" : "private, max-age=31536000, immutable");
   const filename = path.join(generatedRoot, request.params.id, request.params.filename);
   if (request.params.filename === "video.mp4" && request.query.download === "1") {
     const title = String(jobs.get(request.params.id)?.title || "Tiny Moods").replace(/[<>/\\]/g, "").trim() || "Tiny Moods";
