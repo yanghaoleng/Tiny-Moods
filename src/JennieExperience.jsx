@@ -183,6 +183,10 @@ export default function JennieExperience({
   const themeTimer = useRef(null);
   const portraitButtonRef = useRef(null);
   const audioRef = useRef(null);
+  const audioResumeTimer = useRef(null);
+  const manualAudioPauseRef = useRef(false);
+  const musicEnabledRef = useRef(true);
+  const wechatAudioConsentRef = useRef(wechatAudioConsent);
   const stageRef = useRef(null);
 
   const avatarIndex = (look * 7) % avatarSet.length;
@@ -221,18 +225,54 @@ export default function JennieExperience({
     [],
   );
 
+  useEffect(() => {
+    musicEnabledRef.current = musicEnabled;
+  }, [musicEnabled]);
+
+  useEffect(() => {
+    wechatAudioConsentRef.current = wechatAudioConsent;
+  }, [wechatAudioConsent]);
+
+  const clearAudioResumeTimer = useCallback(() => {
+    window.clearTimeout(audioResumeTimer.current);
+    audioResumeTimer.current = null;
+  }, []);
+
   const requestAudioPlay = useCallback(async ({allowWhenDisabled = false} = {}) => {
     const audio = audioRef.current;
     if (!audio || (!musicEnabled && !allowWhenDisabled)) return false;
 
     try {
+      clearAudioResumeTimer();
+      if (audio.ended) audio.currentTime = 0;
       await audio.play();
       return true;
     } catch {
       setAudioPlaying(false);
       return false;
     }
-  }, [musicEnabled]);
+  }, [clearAudioResumeTimer, musicEnabled]);
+
+  const scheduleAudioResume = useCallback((delay = 360) => {
+    if (!musicEnabledRef.current || !wechatAudioConsentRef.current || manualAudioPauseRef.current) return;
+    clearAudioResumeTimer();
+    audioResumeTimer.current = window.setTimeout(() => {
+      audioResumeTimer.current = null;
+      const audio = audioRef.current;
+      if (!audio || !musicEnabledRef.current || !wechatAudioConsentRef.current || manualAudioPauseRef.current) return;
+      if (document.visibilityState === "hidden") return;
+      try {
+        if (audio.ended || (Number.isFinite(audio.duration) && audio.currentTime >= audio.duration - 0.12)) {
+          audio.currentTime = 0;
+        }
+      } catch {
+        // Some embedded browsers can reject currentTime near source teardown.
+      }
+      void requestAudioPlay();
+    }, delay);
+  }, [clearAudioResumeTimer, requestAudioPlay]);
+
+  useEffect(() => () => clearAudioResumeTimer(), [clearAudioResumeTimer]);
 
   useEffect(() => {
     if (!wechatAudioConsent) return;
@@ -252,25 +292,64 @@ export default function JennieExperience({
     };
   }, [audioPlaying, musicEnabled, requestAudioPlay, wechatAudioConsent]);
 
+  useEffect(() => {
+    const resumeVisibleAudio = () => {
+      const audio = audioRef.current;
+      if (!audio || !audio.paused) return;
+      if (document.visibilityState === "hidden") return;
+      scheduleAudioResume(80);
+    };
+    document.addEventListener("visibilitychange", resumeVisibleAudio);
+    window.addEventListener("pageshow", resumeVisibleAudio);
+    return () => {
+      document.removeEventListener("visibilitychange", resumeVisibleAudio);
+      window.removeEventListener("pageshow", resumeVisibleAudio);
+    };
+  }, [scheduleAudioResume]);
+
   const toggleMusic = useCallback(async () => {
     const audio = audioRef.current;
     if (!audio) return;
     if (audioPlaying) {
+      manualAudioPauseRef.current = true;
+      clearAudioResumeTimer();
       audio.pause();
       setMusicEnabled(false);
       setAudioPlaying(false);
       return;
     }
+    manualAudioPauseRef.current = false;
     setMusicEnabled(true);
     setWechatAudioConsent(true);
     await requestAudioPlay({allowWhenDisabled: true});
-  }, [audioPlaying, requestAudioPlay]);
+  }, [audioPlaying, clearAudioResumeTimer, requestAudioPlay]);
 
   const startWechatAudio = useCallback(async () => {
+    manualAudioPauseRef.current = false;
     setMusicEnabled(true);
     setWechatAudioConsent(true);
     await requestAudioPlay({allowWhenDisabled: true});
   }, [requestAudioPlay]);
+
+  const handleAudioPlaying = useCallback(() => {
+    clearAudioResumeTimer();
+    setAudioPlaying(true);
+  }, [clearAudioResumeTimer]);
+
+  const handleAudioPause = useCallback(() => {
+    setAudioPlaying(false);
+    scheduleAudioResume();
+  }, [scheduleAudioResume]);
+
+  const handleAudioEnded = useCallback(() => {
+    setAudioPlaying(false);
+    scheduleAudioResume(40);
+  }, [scheduleAudioResume]);
+
+  const handleAudioError = useCallback(() => {
+    clearAudioResumeTimer();
+    setAudioPlaying(false);
+  }, [clearAudioResumeTimer]);
 
   const changeLook = useCallback((event) => {
     const id = rippleId.current + 1;
@@ -334,9 +413,10 @@ export default function JennieExperience({
         autoPlay={musicEnabled && wechatAudioConsent}
         loop
         preload="auto"
-        onPlaying={() => setAudioPlaying(true)}
-        onPause={() => setAudioPlaying(false)}
-        onError={() => setAudioPlaying(false)}
+        onPlaying={handleAudioPlaying}
+        onPause={handleAudioPause}
+        onEnded={handleAudioEnded}
+        onError={handleAudioError}
       />
       <AnimatePresence>
         {introVisible ? (
