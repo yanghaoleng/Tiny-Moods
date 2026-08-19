@@ -11,7 +11,7 @@ WorkingDirectory=/opt/9face/current
 Environment=NODE_ENV=production
 Environment=PORT=8095
 Environment=PUBLIC_ORIGIN=https://tinymoods.mikeywa.site
-Environment=ENV_FILE=/etc/9face.env
+EnvironmentFile=/etc/9face.env
 Environment=DATA_ROOT=/var/lib/9face
 Environment=PAYMENT_PROVIDER=xunhu
 Environment=REMOTION_CONCURRENCY=1

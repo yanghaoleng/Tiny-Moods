@@ -10,7 +10,7 @@
 
 ## 首页与打赏
 
-- 产品名统一为 `Tiny Moods`；首页主标题每次进入时从 `landingHeadlines` 的 11 句文案中随机选择一句，点击标题随机换一句且不连续重复
+- 产品名统一为 `Tiny Moods`；页面标题、Canonical 和分享入口统一使用 `tinymoods.mikeywa.site`；首页主标题每次进入时从 `landingHeadlines` 的 11 句文案中随机选择一句，点击标题随机换一句且不连续重复
 - 右侧以错位 2×2 摆 Jennie、团子、耙耙柑、羊石坨坨四个动态异形头像；每个头像下方是白底黑字播放按钮
 - 首页上传按钮为无阴影扁平药丸，六种高对比彩虹色以 8.4 秒循环
 - App Icon 旁使用首字母大写的 `Tiny Moods`，固定为同字号、同基线、`850` 粗细的 Cormorant Garamond 衬线字

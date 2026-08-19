@@ -2,6 +2,8 @@
 
 线上地址：<https://tinymoods.mikeywa.site/>
 
+公开仓库：<https://github.com/yanghaoleng/Tiny-Moods>
+
 ## 产品目标
 
 用户上传一张有权使用的人物或宠物正脸照，生成九张透明纯头部表情、永久互动页和 9:16 短视频。生成前展示微信/支付宝自愿打赏二维码，金额提示为 `¥0.6`，不核验金额。
@@ -31,9 +33,9 @@
 - 案例角色无卡片边框，在留白中轻微浮动
 - 案例桌面端使用 3:4 浮窗，移动端使用底部半弹窗；嵌入预览隐藏返回按钮
 - 分享二维码为 1080×1080 纯黑白方形码，不带标题、头像、说明或其他海报元素
-- 打赏与分享弹窗统一为极简黑白风格；本轮仅部署本地预览，尚未发布生产
+- 打赏与分享弹窗统一为极简黑白风格，已随 Tiny Moods 正式版本发布
 - 首页主标题使用 Typer 波浪入场，字形依次经历实心、反白、强调色和描边状态后落回加粗纯文字
-- 9 个相机图标已全部保留在本地品牌组件中，临时选择 Tab 已移除；`public/app-icon.png` 原文件不覆盖，本轮尚未发布生产
+- 9 个相机图标已全部保留在品牌组件中，临时选择 Tab 已移除；`public/app-icon.png` 原文件不覆盖，已发布生产
 
 ## 架构
 
@@ -112,11 +114,12 @@ node scripts/sync-home-examples.mjs
 - 数据：`/var/lib/9face`
 - 配置：`/etc/9face.env`
 - 服务：`9face.service` → `127.0.0.1:8095`
-- 入口：Nginx `https://9face.mikeywa.site`
-- HTTPS：Let's Encrypt 自动续期
-- 当前发布：`/opt/9face/releases/20260819100933`
-- 回滚点：`/opt/9face/releases/20260819000208`
-- 本轮运营后台与埋点仍为本地完成状态，尚未发布生产；正式发布前需在 `/etc/9face.env` 增加 `ADMIN_PASSWORD`、`ADMIN_SESSION_SECRET`、`ANALYTICS_SALT`
+- 正式入口：Nginx `https://tinymoods.mikeywa.site`
+- 旧入口：`https://9face.mikeywa.site` 保留为带路径和参数的 `301` 跳转
+- HTTPS：Let's Encrypt 自动续期，当前证书有效至 `2026-11-17`
+- 当前发布：`/opt/9face/releases/20260819143744`
+- 回滚点：`/opt/9face/releases/20260819100933`
+- 运营后台与埋点已发布；`ARK_API_KEY`、管理密码、会话密钥和埋点盐值只保存在服务器环境文件，不进入仓库
 
 ## 成本
 

@@ -4,5 +4,10 @@ generated/
 orders/
 data/
 output/
-.env.local
+.env
+.env.*
+!.env.example
+.npmrc
+*.pem
+*.key
 .DS_Store

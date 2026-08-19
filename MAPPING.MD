@@ -61,6 +61,7 @@
 | 渲染 Loader | 随机蜡笔替换动画 | `LoadingDoodle` |
 | 旧服务端渲染接口 | 已停用兼容入口 | `/api/*/renders`，返回 `410` |
 | B 端 / 后台 / 运营后台 | 内部生成与行为数据控制台 | `/admin` / `AdminApp` / `.admin-page` |
+| 正式域名 / Tiny Moods 网站 | 对外唯一 HTTPS 入口，旧 `9face` 域名跳转至此 | `https://tinymoods.mikeywa.site` / `PUBLIC_ORIGIN` / `deploy/9face.nginx.conf` |
 | 后台密码 / 密码键盘 | 无账户名的 6 位管理口令；手机数字键盘、电脑数字键与回车兼容 | `ADMIN_PASSWORD` / `#admin-password` / `inputMode="numeric"` |
 | 后台总览 / 数据大盘 | 生成数量、访问、停留、交互和成本汇总 | `/api/admin/dashboard` / `.admin-overview` |
 | 生成记录 / 作品列表 | 可筛选的九图与永久链接列表 | `JobCard` / `.admin-job-grid` |
