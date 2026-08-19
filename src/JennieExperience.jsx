@@ -48,8 +48,8 @@ const stickerSlots = [
   { x: 85, y: 84, size: 48, rotate: -7 },
 ];
 
-const THEME_TRANSITION_DURATION = 5625;
-const AUTO_CHANGE_INTERVAL = 6563;
+const THEME_TRANSITION_DURATION = 1200;
+const AUTO_CHANGE_INTERVAL = 1500;
 const carouselBackgrounds = [
   {bg: "#f8e9ee", accent: "#d98ba5"},
   {bg: "#eaf4fa", accent: "#78afd0"},

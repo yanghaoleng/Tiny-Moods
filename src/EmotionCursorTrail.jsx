@@ -50,9 +50,9 @@ const STATIC_BADGES = [
 
 const DROP_INTERVAL_MS = 88;
 const MIN_TRAVEL_PX = 26;
-const BADGE_LIFE_MS = 1180;
+const BADGE_LIFE_MS = 900;
 const COLLISION_GAP_PX = 4;
-const MAX_LIVE = 16;
+const BADGE_POOL_SIZE = 10;
 
 function subscribeMedia(query, callback) {
   const media = window.matchMedia(query);
@@ -86,6 +86,27 @@ function intersects(candidate, badge) {
   );
 }
 
+function measureBadgeSizes(layer) {
+  const measureLayer = document.createElement("div");
+  measureLayer.className = "emotion-trail-measure";
+  const elements = EMOTION_WORDS.map((text) => {
+    const element = document.createElement("span");
+    element.className = "emotion-trail-badge";
+    element.textContent = text;
+    measureLayer.appendChild(element);
+    return element;
+  });
+  layer.appendChild(measureLayer);
+
+  const sizes = new Map();
+  elements.forEach((element, index) => {
+    const {width, height} = element.getBoundingClientRect();
+    sizes.set(EMOTION_WORDS[index], {width, height});
+  });
+  measureLayer.remove();
+  return sizes;
+}
+
 export default function EmotionCursorTrail() {
   const layerRef = useRef(null);
   const cursorRef = useRef(null);
@@ -98,26 +119,48 @@ export default function EmotionCursorTrail() {
     if (!layer || !cursor || !finePointer || reducedMotion) return undefined;
 
     const root = document.documentElement;
-    const liveBadges = new Map();
+    const badgeSizes = measureBadgeSizes(layer);
+    const liveBadges = new Set();
+    const poolFragment = document.createDocumentFragment();
+    const badgePool = Array.from({length: BADGE_POOL_SIZE}, () => {
+      const element = document.createElement("span");
+      element.className = "emotion-trail-badge";
+      element.style.visibility = "hidden";
+      poolFragment.appendChild(element);
+      return {element, active: false, rect: null, animation: null};
+    });
+    layer.appendChild(poolFragment);
     let bag = [];
     let lastWordIndex = -1;
     let lastVisibleWord = "";
     let colorIndex = Math.floor(Math.random() * COLORS.length);
-    let lastDropTime = -Infinity;
+    let lastAttemptTime = -Infinity;
     let lastDropX = 0;
     let lastDropY = 0;
     let hasDropped = false;
     let pointerX = -100;
     let pointerY = -100;
-    let cursorFrame = 0;
+    let pointerFrame = 0;
+    let pointerInViewport = false;
     let visible = false;
     let paused = document.hidden;
 
+    const releaseBadge = (badge) => {
+      const animation = badge.animation;
+      badge.animation = null;
+      if (animation) {
+        animation.onfinish = null;
+        animation.cancel();
+      }
+      badge.active = false;
+      badge.rect = null;
+      badge.element.style.visibility = "hidden";
+      badge.element.removeAttribute("data-live");
+      liveBadges.delete(badge);
+    };
+
     const clearBadges = () => {
-      liveBadges.forEach(({element, timer}) => {
-        window.clearTimeout(timer);
-        element.remove();
-      });
+      badgePool.forEach(releaseBadge);
       liveBadges.clear();
     };
 
@@ -133,77 +176,84 @@ export default function EmotionCursorTrail() {
       return EMOTION_WORDS[wordIndex];
     };
 
-    const publishCursor = () => {
-      cursorFrame = 0;
-      cursor.style.transform = `translate3d(${pointerX}px, ${pointerY}px, 0)`;
-    };
-
-    const scheduleCursor = () => {
-      if (!cursorFrame) cursorFrame = window.requestAnimationFrame(publishCursor);
-    };
-
-    const spawnBadge = (x, y, now) => {
-      if (liveBadges.size >= MAX_LIVE) return;
+    const spawnBadge = (x, y) => {
+      const badge = badgePool.find(({active}) => !active);
+      if (!badge) return;
 
       let text = nextWord();
       while (text === lastVisibleWord) text = nextWord();
 
-      const element = document.createElement("span");
-      element.className = "emotion-trail-badge";
+      const {element} = badge;
+      const {width, height} = badgeSizes.get(text);
       element.textContent = text;
       element.style.background = COLORS[colorIndex];
-      element.style.visibility = "hidden";
-      layer.appendChild(element);
-
-      const {width, height} = element.getBoundingClientRect();
       const left = Math.max(6, Math.min(window.innerWidth - width - 6, x - width / 2));
       const top = Math.max(6, Math.min(window.innerHeight - height - 6, y - height / 2));
       const candidate = {left, top, right: left + width, bottom: top + height};
 
-      if ([...liveBadges.values()].some(({rect}) => intersects(candidate, rect))) {
-        element.remove();
-        return;
+      for (const liveBadge of liveBadges) {
+        if (intersects(candidate, liveBadge.rect)) return;
       }
 
       element.style.transform = `translate3d(${left}px, ${top}px, 0)`;
       element.style.visibility = "visible";
       element.dataset.live = "true";
+      badge.active = true;
+      badge.rect = candidate;
+      liveBadges.add(badge);
       lastVisibleWord = text;
       colorIndex = (colorIndex + 1) % COLORS.length;
 
-      const timer = window.setTimeout(() => {
-        element.remove();
-        liveBadges.delete(element);
-      }, BADGE_LIFE_MS + 40);
-
-      liveBadges.set(element, {element, rect: candidate, timer});
-      lastDropTime = now;
+      const animation = element.animate(
+        [
+          {opacity: 0, scale: 0.96, offset: 0},
+          {opacity: 1, scale: 1, offset: 0.203},
+          {opacity: 1, scale: 1, offset: 0.712},
+          {opacity: 0, scale: 0.98, offset: 1},
+        ],
+        {duration: BADGE_LIFE_MS, easing: "linear", fill: "both"},
+      );
+      badge.animation = animation;
+      animation.onfinish = () => releaseBadge(badge);
       lastDropX = x;
       lastDropY = y;
       hasDropped = true;
+    };
+
+    const publishPointerFrame = (now) => {
+      pointerFrame = 0;
+      if (paused || !pointerInViewport) return;
+      cursor.style.transform = `translate3d(${pointerX}px, ${pointerY}px, 0)`;
+      if (!visible) {
+        visible = true;
+        cursor.dataset.visible = "true";
+      }
+
+      const traveled = hasDropped
+        ? Math.hypot(pointerX - lastDropX, pointerY - lastDropY)
+        : Infinity;
+      if (now - lastAttemptTime >= DROP_INTERVAL_MS && traveled >= MIN_TRAVEL_PX) {
+        lastAttemptTime = now;
+        spawnBadge(pointerX, pointerY);
+      }
+    };
+
+    const schedulePointerFrame = () => {
+      if (!pointerFrame) pointerFrame = window.requestAnimationFrame(publishPointerFrame);
     };
 
     const onPointerMove = (event) => {
       if (event.pointerType === "touch" || paused) return;
       pointerX = event.clientX;
       pointerY = event.clientY;
-      scheduleCursor();
-
-      if (!visible) {
-        visible = true;
-        cursor.dataset.visible = "true";
-      }
-
-      const now = performance.now();
-      const traveled = hasDropped
-        ? Math.hypot(pointerX - lastDropX, pointerY - lastDropY)
-        : Infinity;
-      if (now - lastDropTime >= DROP_INTERVAL_MS && traveled >= MIN_TRAVEL_PX) {
-        spawnBadge(pointerX, pointerY, now);
-      }
+      pointerInViewport = true;
+      schedulePointerFrame();
     };
 
     const hideCursor = () => {
+      pointerInViewport = false;
+      if (pointerFrame) window.cancelAnimationFrame(pointerFrame);
+      pointerFrame = 0;
       visible = false;
       cursor.dataset.visible = "false";
       cursor.dataset.pressed = "false";
@@ -249,8 +299,9 @@ export default function EmotionCursorTrail() {
       window.removeEventListener("pointercancel", onPointerUp);
       window.removeEventListener("blur", hideCursor);
       document.removeEventListener("visibilitychange", onVisibilityChange);
-      if (cursorFrame) window.cancelAnimationFrame(cursorFrame);
+      if (pointerFrame) window.cancelAnimationFrame(pointerFrame);
       clearBadges();
+      badgePool.forEach(({element}) => element.remove());
     };
   }, [finePointer, reducedMotion]);
 

@@ -72,7 +72,8 @@
 | 左上角声音开关 / 静音按钮 | 互动页唯一声音开关，控制背景音乐 | `.experience-bgm-toggle` / `musicEnabled` / `audioPlaying` |
 | 界面音效开关 | 生成进度页等非互动页的界面音效开关，首页不显示 | `UISoundToggle` / `.ui-sfx-toggle` / `9face:ui-sfx` |
 | 右下角 Made for | 已删除的互动页归属角标 | 原 `.corner-note` / 原 `cornerText` |
-| 大黑鼠标 / 情绪词轨迹 | 桌面自定义指针与无重叠彩色情绪标签拖尾 | `EmotionCursorTrail` / `.emotion-cursor` / `.emotion-trail-badge` |
+| 大黑鼠标 / 情绪词轨迹 | 精细指针设备的自定义指针与无重叠彩色情绪标签拖尾 | `EmotionCursorTrail` / `.emotion-cursor` / `.emotion-trail-badge` |
+| 鼠标移动卡顿 / 拖尾掉帧 | 逐帧合并事件、初始化缓存尺寸、固定复用 10 个节点并移除移动箭头滤镜 | `publishPointerFrame` / `measureBadgeSizes` / `BADGE_POOL_SIZE` / `element.animate` |
 | 生成中的低音 | 本机渲染持续反馈 | `processingSound` / `processing` |
 | 渲染 Loader | 随机蜡笔替换动画 | `LoadingDoodle` |
 | 旧服务端渲染接口 | 已停用兼容入口 | `/api/*/renders`，返回 `410` |

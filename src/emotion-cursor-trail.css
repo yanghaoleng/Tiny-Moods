@@ -22,7 +22,6 @@
   height: 37px;
   color: #151216;
   opacity: 0;
-  filter: drop-shadow(0 1px 0 rgb(255 255 255 / 0.92));
   transform: translate3d(-100px, -100px, 0);
   transform-origin: 6px 6px;
   transition: opacity 90ms ease, translate 70ms ease;
@@ -60,11 +59,20 @@
   opacity: 0;
   scale: 0.96;
   transform-origin: center;
-  will-change: opacity, transform;
 }
 
-.emotion-trail-badge[data-live="true"] {
-  animation: emotion-badge-life 1180ms both;
+.emotion-trail-measure {
+  position: fixed;
+  top: -1000px;
+  left: -1000px;
+  display: flex;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.emotion-trail-measure .emotion-trail-badge {
+  position: static;
+  flex: none;
 }
 
 .emotion-static-trail {
@@ -81,28 +89,6 @@
   display: block;
   padding: 2px 5px;
   border-radius: 3px;
-}
-
-@keyframes emotion-badge-life {
-  0% {
-    opacity: 0;
-    scale: 0.96;
-    animation-timing-function: linear;
-  }
-  20.3% {
-    opacity: 1;
-    scale: 1;
-    animation-timing-function: linear;
-  }
-  71.2% {
-    opacity: 1;
-    scale: 1;
-    animation-timing-function: linear;
-  }
-  100% {
-    opacity: 0;
-    scale: 0.98;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
