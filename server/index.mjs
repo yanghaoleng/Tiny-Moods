@@ -17,6 +17,7 @@ import {
 import {
   defaultImageModelKey,
   findImageModel,
+  imageModelApiKey,
   publicImageModelOptions,
   resolveImageModel,
 } from "./image-models.mjs";
@@ -751,7 +752,7 @@ app.get("/api/health", (_request, response) => {
   response.setHeader("Cache-Control", "no-store");
   response.json({
     ok: true,
-    configured: Boolean(process.env.ARK_API_KEY) || process.env.GENERATOR_DEMO_MODE === "1",
+    configured: Boolean(imageModelApiKey(defaultModel)) || process.env.GENERATOR_DEMO_MODE === "1",
     demoMode: process.env.GENERATOR_DEMO_MODE === "1",
     model: defaultModel.model,
     priceCny: defaultModel.priceCny,

@@ -26,9 +26,9 @@ const MAX_FILE_SIZE = 12 * 1024 * 1024;
 const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 const defaultAppearance = {backgroundMode: "color", patternStyle: "dots", decorations: true};
 const fallbackDonationModels = [
-  {key: "pro", label: "Seedream 5.0 Pro", description: "更高画质与复杂指令表现", size: "2144x2144", priceCny: "0.60"},
+  {key: "lite", label: "Seedream 5.0 Lite", description: "轻量快速生成，适合默认体验", size: "2K", priceCny: "0.22"},
 ];
-const defaultGenerationModelKey = "pro";
+const defaultGenerationModelKey = "lite";
 const generationCountdownSeconds = 60;
 const generationProgressCap = 90;
 const donationThanksCopies = [

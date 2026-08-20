@@ -6,11 +6,11 @@
 
 ## 产品目标
 
-用户上传一张有权使用的人物或宠物正脸照，生成九张透明纯头部表情、永久互动页和 9:16 短视频。生成固定使用 Seedream 5.0 Pro；微信/支付宝打赏为自愿支持，不核验金额。
+用户上传一张有权使用的人物或宠物正脸照，生成九张透明纯头部表情、永久互动页和 9:16 短视频。生成固定使用 Seedream 5.0 Lite；微信/支付宝打赏为自愿支持，不核验金额。
 
 ## 核心功能
 
-- 生成固定使用 Seedream 5.0 Pro，打赏层不展示模型 Switch；旧客户端残留模型参数会被服务端归一到 Pro
+- 生成固定使用 Seedream 5.0 Lite，打赏层不展示模型 Switch；旧客户端残留模型参数会被服务端归一到 Lite
 - 打赏建议固定显示 `¥1 ~ ¥3`；费用说明在句号后强制换行，10 条简短感谢文案每次随机出现，Typer 负责逐字波浪入场，并遵循系统减少动效设置
 - 打赏层提供作者微信 `yanghaoleng` 一键复制，用于收集问题和建议
 - 微信打赏使用微信原生赞赏码 JPEG，保持完整码面供微信识别；不接支付 API，不校验打赏结果
@@ -62,7 +62,7 @@
 
 ```text
 浏览器选图并本地暂存
-  → 确认自愿打赏说明后创建 Pro 生成凭证
+  → 确认自愿打赏说明后创建 Lite 生成凭证
   → 服务端保存上传原图和请求线索，安全调用 Seedream（密钥不下发）
   → 浏览器 Web Worker 无缝拆图、抠白底
   → 火山原始九宫格永久保留，浏览器另行输出九张 1080px 透明 WebP 供互动页使用
@@ -71,7 +71,7 @@
 
 - 前端：Vite、React、Motion、Calligraph、UI SFX / Web Audio、Canvas 2D、Web Worker、Remotion Web Renderer
 - 服务端：Express、Multer、Sharp，负责模型密钥、任务/订单状态、上传原图、永久素材、匿名埋点和运营后台；不渲染视频
-- 模型：火山方舟 Pro `doubao-seedream-5-0-pro-260628`；可通过服务端环境变量覆盖 Pro API Key、模型 ID、尺寸和估算成本
+- 模型：火山方舟 Lite `doubao-seedream-5-0-260128`；可通过服务端环境变量覆盖 Lite API Key、模型 ID、尺寸和估算成本
 - 视频：1080×1920 布局按 `2/3` 缩放输出为 720×1280、30fps、约 21.27 秒、9 个造型；优先 H.264/AAC MP4
 - 数据：生产 `DATA_ROOT=/var/lib/9face`；作品资源使用同源相对地址，埋点按北京时间写入 `analytics/events/YYYY-MM-DD.jsonl`
 - 匿名身份：Cookie `tiny_moods_visitor` 仅保存随机访客 ID，HttpOnly、SameSite=Lax、有效期一年；照片、名字和作品访问令牌不写入 Cookie
@@ -81,7 +81,7 @@
 
 ## API
 
-- `GET /api/health`：可选模型、默认模型、对应建议金额、免费模式及媒体处理状态
+- `GET /api/health`：当前固定模型、对应建议金额、免费模式及媒体处理状态
 - `GET /api/history`：按匿名 Cookie 返回当前浏览器的生成记录及实时状态
 - `GET /api/works/search?name=`：按完整名字精确查询已完成或等待前端处理的作品，最多返回最近 20 个同名结果；待处理结果附带恢复凭证
 - `POST /api/analytics/events`：批量接收匿名访问、可见停留和交互事件
@@ -90,7 +90,7 @@
 - `GET /api/admin/jobs/:id/events`：读取单次生成的埋点明细
 - `GET /api/admin/jobs/:id/upload`：后台查看或下载用户上传原图；加 `?download=1` 下载原始文件
 - `GET /api/admin/jobs/:id/sheet`：后台查看任务保留的九宫格母图
-- `POST /api/orders/donation`：提交 `title` 后创建 Pro 免费生成凭证；兼容旧 `model` 参数但不向用户提供选择
+- `POST /api/orders/donation`：提交 `title` 后创建 Lite 免费生成凭证；兼容旧 `model` 参数但不向用户提供选择
 - `POST /api/jobs`：上传照片并创建任务；服务端保存上传原图、文件信息和无需额外权限的请求/设备线索
 - `GET /api/jobs/:id`：读取任务和永久素材
 - `PATCH /api/jobs/:id/appearance`：作品主人保存背景与装饰显示设置
@@ -158,12 +158,12 @@ node scripts/sync-home-examples.mjs
 - 正式入口：Nginx `https://tinymoods.mikeywa.site`
 - 旧入口：`https://9face.mikeywa.site` 保留为带路径和参数的 `301` 跳转
 - HTTPS：Let's Encrypt 自动续期，当前证书有效至 `2026-11-17`
-- 当前发布：`/opt/9face/releases/20260819203241`
-- 直接回滚点：`/opt/9face/releases/20260819202300`
-- 运营后台与埋点已发布；`ARK_API_KEY`、管理密码、会话密钥和埋点盐值只保存在服务器环境文件，不进入仓库
+- 当前发布：`/opt/9face/releases/20260820095100`
+- 直接回滚点：`/opt/9face/releases/20260819203241`
+- 运营后台与埋点已发布；`SEEDREAM_LITE_API_KEY`、管理密码、会话密钥和埋点盐值只保存在服务器环境文件，不进入仓库
 - 后续每个完成任务默认执行本地提交、推送和正式部署
 
 ## 成本
 
-- Seedream Pro 每次生成一张 `2144×2144` 九宫格，当前项目估算 `0.60 元`
+- Seedream Lite 每次生成一张 `2K` 九宫格，当前项目估算 `0.22 元`
 - 本地拆图、抠图和反复渲染视频不产生模型费用，也不消耗服务器渲染资源

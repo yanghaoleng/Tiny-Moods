@@ -1,22 +1,26 @@
 const uniq = (items) => [...new Set(items.map((item) => String(item || "").trim()).filter(Boolean))];
 
-const proModel = () => ({
-  key: "pro",
-  label: "Seedream 5.0 Pro",
-  description: "更高画质与复杂指令表现",
-  model: process.env.SEEDREAM_PRO_MODEL || process.env.SEEDREAM_MODEL || "doubao-seedream-5-0-pro-260628",
-  size: process.env.SEEDREAM_PRO_SIZE || process.env.SEEDREAM_SIZE || "2144x2144",
-  priceCny: process.env.SEEDREAM_PRO_PRICE_CNY || "0.60",
+const liteModel = () => ({
+  key: "lite",
+  label: "Seedream 5.0 Lite",
+  description: "轻量快速生成，适合默认体验",
+  model: process.env.SEEDREAM_LITE_MODEL || "doubao-seedream-5-0-260128",
+  fallbackModels: uniq([
+    process.env.SEEDREAM_LITE_MODEL,
+    "doubao-seedream-5-0-260128",
+  ]),
+  size: process.env.SEEDREAM_LITE_SIZE || "2K",
+  priceCny: process.env.SEEDREAM_LITE_PRICE_CNY || "0.22",
 });
 
-export const imageModelOptions = () => [proModel()];
+export const imageModelOptions = () => [liteModel()];
 
-export const defaultImageModelKey = () => "pro";
+export const defaultImageModelKey = () => "lite";
 
 export const findImageModel = (key) => imageModelOptions().find((option) => option.key === key) || null;
 
 export const resolveImageModel = (key) => (
-  findImageModel(key) || proModel()
+  findImageModel(key) || liteModel()
 );
 
 export const candidateImageModelIds = (selectedModel) => {

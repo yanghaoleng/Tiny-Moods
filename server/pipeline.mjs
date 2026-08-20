@@ -59,7 +59,7 @@ export const getSeedreamBuffer = async (sourceBuffer, selectedModel) => {
     .resize({width: 2048, height: 2048, fit: "inside", withoutEnlargement: true})
     .jpeg({quality: 92})
     .toBuffer();
-  const image = [`data:image/jpeg;base64,${normalizedInput.toString("base64")}`];
+  const image = `data:image/jpeg;base64,${normalizedInput.toString("base64")}`;
   const modelIds = candidateImageModelIds(selectedModel);
   let lastFailure = null;
   for (const model of modelIds) {
@@ -67,8 +67,10 @@ export const getSeedreamBuffer = async (sourceBuffer, selectedModel) => {
       model,
       prompt: expressionPrompt,
       image,
+      sequential_image_generation: "disabled",
       size: selectedModel.size,
       response_format: "url",
+      stream: false,
       watermark: false,
     };
     const response = await fetch(
