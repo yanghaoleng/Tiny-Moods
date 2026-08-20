@@ -1711,7 +1711,7 @@
   position: relative;
   display: grid;
   width: 100%;
-  min-height: 320px;
+  min-height: 160px;
   place-items: center;
   overflow: hidden;
   padding: 24px;

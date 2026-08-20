@@ -17,7 +17,7 @@
 | 上传照片 | 点击或拖拽单图入口 | `acceptDroppedFiles` / `.photo-dropzone` |
 | 用户上传原图 / 上传源图 | 用户提交的原始 JPG、PNG 或 WebP，仅后台可查看和下载 | `uploadedSourceFilename` / `uploadedSource` / `uploadedSourceUrl` / `/api/admin/jobs/:id/upload` |
 | 上传信息 / IP 设备信息 | 创建任务时无需额外权限即可从请求头读取的 IP、转发 IP、User-Agent、语言、来源页和大致地址线索 | `uploadRequest` / `requestInfoFrom` / `parseUserAgent` / `JobDetail` |
-| 拖入框 / 上传栏 | 收短后的单图拖拽上传区，首页不使用上下分割线 | `.photo-dropzone` / `.photo-workbench` / `.landing-theme .generator-nav` / `.example-section` |
+| 拖入框 / 上传栏 | 单图上传空态，桌面 160px、手机 150px；选图后恢复较高预览区 | `.photo-dropzone` / `.photo-dropzone.has-photo` / `.photo-workbench` |
 | 对象名字 / 谁的名字 | 选图后展开的名称输入，说明位于输入框上方 | `subjectName` / `.subject-name-field` / `.subject-name-copy` |
 | 右上角生成记录 / 我的作品 | 当前浏览器通过匿名 Cookie 关联的任务记录入口 | `WorkHistoryDialog` / `.history-trigger` / `/api/history` / `tiny_moods_visitor` |
 | 左下角作者主页 / 作者链接 | 页面底部左侧通往 Mikey 国内主页、使用 NCM 同款页边距的小字外链 | `.landing-footer` / `author_home_open` / `https://mikeywa.site` |
