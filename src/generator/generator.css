@@ -370,6 +370,7 @@
 .remove-photo:focus-visible,
 .change-photo:focus-visible,
 .donation-close:focus-visible,
+.donation-model-switch button:focus-visible,
 .donation-tabs button:focus-visible,
 .share-sheet-close:focus-visible,
 .share-sheet-back:focus-visible,
@@ -2076,6 +2077,59 @@
 }
 
 .donation-support-char.is-border::after { border-width: 1px; }
+
+.donation-model-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  width: min(282px, 100%);
+  margin: 0 auto 13px;
+  padding: 4px;
+  border: 1px solid rgb(29 27 30 / 0.16);
+  border-radius: 14px;
+  background: #f1f1f0;
+}
+
+.donation-model-switch button {
+  display: grid;
+  gap: 2px;
+  min-height: 54px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 10px;
+  color: #686367;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.donation-model-switch button strong {
+  color: inherit;
+  font-size: 0.95rem;
+  font-weight: 1000;
+  line-height: 1.1;
+}
+
+.donation-model-switch button span {
+  color: inherit;
+  font-size: 0.72rem;
+  font-weight: 850;
+  line-height: 1.2;
+}
+
+.donation-model-switch button.is-selected {
+  color: #f9f8f8;
+  background: #1d1b1e;
+}
+
+.donation-model-switch button:active {
+  transform: scale(0.98);
+}
+
+.donation-model-switch button:disabled {
+  cursor: wait;
+}
 
 .donation-contact-copy {
   margin: 10px auto 13px;

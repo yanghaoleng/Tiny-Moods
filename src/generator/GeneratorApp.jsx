@@ -26,9 +26,10 @@ const MAX_FILE_SIZE = 12 * 1024 * 1024;
 const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 const defaultAppearance = {backgroundMode: "color", patternStyle: "dots", decorations: true};
 const fallbackDonationModels = [
-  {key: "lite", label: "Seedream 5.0 Lite", description: "轻量快速生成，适合默认体验", size: "2K", priceCny: "0.22"},
+  {key: "lite", label: "Seedream 5.0 Lite", description: "速度快", size: "2K", priceCny: "0.22"},
+  {key: "pro", label: "Seedream 5.0 Pro", description: "质量好", size: "2144x2144", priceCny: "0.60"},
 ];
-const defaultGenerationModelKey = "lite";
+const defaultGenerationModelKey = "pro";
 const generationCountdownSeconds = 60;
 const generationProgressCap = 90;
 const donationThanksCopies = [
@@ -1282,9 +1283,11 @@ function TyperSupportCopy({text, reduceMotion}) {
 function DonationDialog({busy, error, models = fallbackDonationModels, onClose, onContinue}) {
   const reduceMotion = useReducedMotion();
   const [method, setMethod] = useState("wechat");
+  const [selectedModelKey, setSelectedModelKey] = useState(defaultGenerationModelKey);
   const [wechatCopied, setWechatCopied] = useState(false);
   const [supportCopy] = useState(() => `生成图片会产生费用，不需要给太多。\n${donationThanksCopies[Math.floor(Math.random() * donationThanksCopies.length)]}`);
-  const selectedModel = models.find((model) => model.key === defaultGenerationModelKey) || fallbackDonationModels[0];
+  const modelOptions = models.length ? models : fallbackDonationModels;
+  const selectedModel = modelOptions.find((model) => model.key === selectedModelKey) || modelOptions.find((model) => model.key === defaultGenerationModelKey) || modelOptions[0] || fallbackDonationModels[1];
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -1308,6 +1311,25 @@ function DonationDialog({busy, error, models = fallbackDonationModels, onClose, 
         <p className="donation-copy donation-support-copy">
           <TyperSupportCopy text={supportCopy} reduceMotion={reduceMotion} />
         </p>
+        <div className="donation-model-switch" role="radiogroup" aria-label="选择生成模型">
+          {modelOptions.map((model) => (
+            <button
+              key={model.key}
+              type="button"
+              role="radio"
+              aria-checked={selectedModel.key === model.key}
+              className={selectedModel.key === model.key ? "is-selected" : ""}
+              onClick={() => setSelectedModelKey(model.key)}
+              data-uisfx="select"
+              data-analytics-action="generation_model_select"
+              data-analytics-target={model.key}
+              disabled={busy}
+            >
+              <strong>{model.key === "lite" ? "Lite" : "Pro"}</strong>
+              <span>{model.description || (model.key === "lite" ? "速度快" : "质量好")}</span>
+            </button>
+          ))}
+        </div>
         <div className="donation-tabs" role="tablist" aria-label="选择打赏方式">
           <button type="button" role="tab" aria-selected={method === "wechat"} className={method === "wechat" ? "is-selected wechat" : "wechat"} onClick={() => setMethod("wechat")} data-uisfx="select" data-analytics-action="donation_method" data-analytics-target="wechat"><WechatLogo weight="fill" />微信</button>
           <button type="button" role="tab" aria-selected={method === "alipay"} className={method === "alipay" ? "is-selected alipay" : "alipay"} onClick={() => setMethod("alipay")} data-uisfx="select" data-analytics-action="donation_method" data-analytics-target="alipay"><span aria-hidden="true">支</span>支付宝</button>

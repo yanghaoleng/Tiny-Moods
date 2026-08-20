@@ -29,8 +29,8 @@
 | 日系相册 / C 方案 | 首页固定的明亮轻日系视觉 | `.landing-theme` |
 | 打赏弹窗 | 免费生成前说明层 | `DonationDialog` |
 | 微信赞赏码 / 长按打赏图 | 微信原生个人赞赏码，不接 API 且不校验支付 | `public/donate/wechat-appreciation-code.jpg` / `.donation-qr-frame` / `DonationDialog` |
-| 选模型 / Pro 和 Lite / 默认 Lite | 已下线的模型 Switch；当前前后台固定 Lite，不向用户展示选择 | `fallbackDonationModels` / `defaultGenerationModelKey` / `image-models.mjs` |
-| Pro 改 Lite / Lite API Key | 当前只暴露 Lite；旧客户端传入 Pro 或 Lite 都会后端归一到 Lite | `resolveImageModel` / `/api/orders/donation` / `modelTier=lite` |
+| 选模型 / Pro 和 Lite / 默认 Pro | 打赏层 Lite / Pro 双选 Switch；Lite=速度快，Pro=质量好 | `fallbackDonationModels` / `defaultGenerationModelKey` / `.donation-model-switch` / `image-models.mjs` |
+| Lite 调通后恢复 Switch | 后端同时暴露 Lite 与 Pro；不传模型或非法模型默认 Pro | `imageModelOptions` / `resolveImageModel` / `/api/orders/donation` |
 | ¥1 ~ ¥3 / 打赏金额 | 无“建议打赏”前缀的固定自愿支持区间 | `.donation-amount` / `suggestedDonationCny` |
 | 价格下面的小字 / 感谢文案 | 建议打赏金额下方的两行支持感谢语，逐字 Typer 入场 | `.donation-support-copy` / `TyperSupportCopy` |
 | ¥1 ~ ¥3 | 固定的自愿打赏建议区间 | `.donation-amount` |
