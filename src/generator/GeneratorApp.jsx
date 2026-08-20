@@ -944,10 +944,17 @@ function JobStatus({job, statusError, local, backLabel = "制作新作品", onBa
   const createdAt = Number.isFinite(Date.parse(job?.createdAt || "")) ? Date.parse(job.createdAt) : now;
   const elapsedSeconds = Math.max(0, Math.floor((now - createdAt) / 1000));
   const countdownSeconds = Math.max(0, generationCountdownSeconds - elapsedSeconds);
-  const projectedProgress = Math.min(generationProgressCap, Math.round((Math.min(elapsedSeconds, generationCountdownSeconds) / generationCountdownSeconds) * generationProgressCap));
+  const queue = job?.queue || {};
+  const queuedAhead = Math.max(0, Number(queue.ahead || 0));
+  const queuedMinutes = Math.max(1, Number(queue.estimatedMinutes || Math.ceil((queue.estimatedSeconds || 0) / 60) || 1));
+  const waitingInQueue = job?.status === "queued" && !queue.active && !local.active && !local.error;
+  const projectedProgress = waitingInQueue ? 0 : Math.min(generationProgressCap, Math.round((Math.min(elapsedSeconds, generationCountdownSeconds) / generationCountdownSeconds) * generationProgressCap));
   const actualProgress = local.error ? local.progress : local.active ? local.progress : job?.progress || 0;
   const progress = Math.max(0, Math.min(100, failed ? actualProgress : Math.max(actualProgress, projectedProgress)));
   const stage = local.error || local.stage || job?.stage || "正在读取任务";
+  const queueMessage = queuedAhead > 0
+    ? `前方还有 ${queuedAhead} 人，预计等待约 ${queuedMinutes} 分钟。`
+    : "前方暂无排队，马上开始生成。";
 
   return (
     <main className="job-page">
@@ -965,8 +972,14 @@ function JobStatus({job, statusError, local, backLabel = "制作新作品", onBa
         <p className="job-kicker">{failed || local.error ? "需要处理" : "请不要关闭本页面"}</p>
         <h1>{stage}</h1>
         <p className="job-description">
-          {failed ? job?.error || statusError || "请稍后重试。" : local.error ? "本地拆图没有成功，原始母图仍安全保留，可以直接重试。" : `预计时间 1 分钟，剩余约 ${countdownSeconds} 秒。九宫格拆图和抠背景会在当前浏览器中完成。`}
+          {failed ? job?.error || statusError || "请稍后重试。" : local.error ? "本地拆图没有成功，原始母图仍安全保留，可以直接重试。" : waitingInQueue ? "模型正在按顺序处理，轮到你后会自动开始。" : `预计时间 1 分钟，剩余约 ${countdownSeconds} 秒。九宫格拆图和抠背景会在当前浏览器中完成。`}
         </p>
+        {!failed && waitingInQueue ? (
+          <div className="job-queue-note" aria-label={queueMessage}>
+            <strong>{queuedAhead}</strong>
+            <span>{queueMessage}</span>
+          </div>
+        ) : null}
         {!failed ? <div className="job-progress" aria-label={`当前进度 ${progress}%`}><div className="job-progress-fill" style={{transform: `scaleX(${progress / 100})`}} /></div> : null}
         {job?.avatars?.length ? (
           <div className="job-faces" aria-label="已经生成的表情预览">{job.avatars.map((avatar, index) => <img key={avatar.src} src={avatar.src} alt={`${job.title} 表情 ${index + 1}`} />)}</div>

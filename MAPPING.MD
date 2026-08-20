@@ -71,6 +71,7 @@
 | 波纹 / 点阵太快 | 半调点阵高亮扩散；手机端扩散时长为桌面两倍 | `HalftoneRippleBackground` / `halftoneTransitionDuration` / `useMobileMotionPacing` |
 | 自动慢慢换一个 / Hover 不打断 | 独立于悬停状态的自动换装计时器；手机端间隔为桌面两倍 | `AUTO_CHANGE_INTERVAL` / `autoChangeInterval` / `changeLook`；头像按钮无 `whileHover` |
 | 预计时间 / 倒计时 / 进度条 | 生成进度页按 1 分钟倒计时，进度条平滑走到 90% | `JobStatus` / `generationCountdownSeconds` / `generationProgressCap` |
+| 排队提示 / 前方几个人 / 还要等多久 | 模型队列提示，并发满时按每人 1 分钟估算等待 | `queueInfoFor` / `activeJobIds` / `workQueue` / `job.queue` / `.job-queue-note` |
 | 立即播放音乐 / 首次点击补播 / 微信里开一下又关 | BGM 自动播放、微信显式点击播放、结束续播与浏览器策略回退 | `autoPlay` / `preload="auto"` / `requestAudioPlay` / `wechatAudioConsent` / `playing` / `ended` |
 | 互动 WebP / 抠图后图片 | 九张 1080px 透明 WebP，只用于网页互动、二维码和视频 | `avatar.src` / `writeFaceWebp` / `/generated/:id/face-XX.webp` |
 | 全部图片压缩 | 静态 PNG 批量转 WebP | `npm run images:optimize` / `scripts/optimize-static-images.mjs` |

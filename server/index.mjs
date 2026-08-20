@@ -45,8 +45,10 @@ const jobs = new Map();
 const orders = new Map();
 const rateHits = new Map();
 const workQueue = [];
+const activeJobIds = new Set();
 let activeWork = 0;
 const maxConcurrentWork = Math.max(1, Number(process.env.MAX_CONCURRENT_JOBS || 1));
+const estimatedQueueSecondsPerJob = 60;
 const maxOrdersPerHour = Math.max(1, Number(process.env.MAX_ORDERS_PER_HOUR || 10));
 const retentionMs = Number(process.env.JOB_RETENTION_HOURS || 168) * 60 * 60 * 1000;
 const orderExpiryMs = Number(process.env.ORDER_EXPIRY_MINUTES || 30) * 60 * 1000;
@@ -299,6 +301,7 @@ const publicJob = (job) => {
     }));
   }
   if (safe.originalImageUrl) safe.originalImageUrl = withAssetRevision(safe.originalImageUrl);
+  safe.queue = queueInfoFor(job);
   return safe;
 };
 
@@ -310,6 +313,7 @@ const historyJob = (job) => ({
   status: job.status,
   stage: job.stage,
   progress: job.progress,
+  queue: queueInfoFor(job),
   pageUrl: job.status === "ready" && job.pageUrl ? job.pageUrl : `/?job=${job.id}`,
   previewUrl: job.avatars?.[0]?.src || null,
   createdAt: job.createdAt,
@@ -416,20 +420,38 @@ const updateOrder = async (id, patch) => {
 
 const drainWorkQueue = () => {
   while (activeWork < maxConcurrentWork && workQueue.length > 0) {
-    const task = workQueue.shift();
+    const item = workQueue.shift();
     activeWork += 1;
+    if (item?.jobId) activeJobIds.add(item.jobId);
     Promise.resolve()
-      .then(task)
+      .then(item.task)
       .catch((error) => console.error("Work queue error:", error instanceof Error ? error.message : String(error)))
       .finally(() => {
+        if (item?.jobId) activeJobIds.delete(item.jobId);
         activeWork -= 1;
         drainWorkQueue();
       });
   }
 };
 
-const enqueueWork = (task) => {
-  workQueue.push(task);
+const queueInfoFor = (job) => {
+  const fallback = {ahead: 0, estimatedSeconds: 0, estimatedMinutes: 0, active: false};
+  if (!job || !["queued", "generating"].includes(job.status)) return fallback;
+  if (activeJobIds.has(job.id)) return {...fallback, active: true};
+  const queueIndex = workQueue.findIndex((item) => item.jobId === job.id);
+  if (queueIndex < 0) return fallback;
+  const ahead = Math.max(0, activeJobIds.size + queueIndex);
+  const estimatedSeconds = ahead * estimatedQueueSecondsPerJob;
+  return {
+    ahead,
+    estimatedSeconds,
+    estimatedMinutes: Math.max(1, Math.ceil(estimatedSeconds / 60)),
+    active: false,
+  };
+};
+
+const enqueueWork = (jobId, task) => {
+  workQueue.push({jobId, task});
   drainWorkQueue();
 };
 
@@ -968,7 +990,7 @@ app.post("/api/jobs", photoUpload.single("photo"), async (request, response) => 
   response.status(202).json({...publicJobForRequest(job, request), accessToken});
 
   const publicOrigin = publicOriginFor(request);
-  enqueueWork(async () => {
+  enqueueWork(id, async () => {
     try {
       await runGenerationPipeline({
         job,

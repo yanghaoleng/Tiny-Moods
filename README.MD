@@ -31,7 +31,7 @@
 - 首页右上角只保留“生成记录”，不显示界面音效静音按钮；服务端用一年期 HttpOnly 匿名 Cookie 关联当前浏览器创建的任务
 - 首页左下角提供小号“作者主页”外链，指向中国大陆访问更快的 `https://mikeywa.site`，页边距与 NCM 保持一致
 - 每个任务创建后立即获得固定恢复地址 `?job=:id`；等待浏览器本地拆图/抠图时重新进入该地址可继续完成，完成后自动进入永久互动页
-- 生成进度页按 1 分钟预估倒计时，进度条会在 60 秒内平滑走到 90%，真实完成后立即进入作品页
+- 生成进度页按 1 分钟预估倒计时，进度条会在 60 秒内平滑走到 90%；如果模型并发已满，会先显示前方排队人数和按每人 1 分钟估算的等待时间
 - 生成记录面板支持输入生成时的完整名字精确查询已完成作品和等待前端处理的作品；后者返回固定恢复链接和恢复凭证，进入后可继续本地拆图与抠图
 - App Icon 旁使用英文产品名 `Tiny Moods`；统一加粗字号，`Tiny` 固定黑底，`Moods` 五个字母独立随机换色
 - `Tiny Moods` 左侧保留 9 个正放扁平透明相机图标；每次进入随机出现一个，点击品牌区域随机切换到另一个且不连续重复
@@ -82,7 +82,7 @@
 ## API
 
 - `GET /api/health`：可选模型、默认模型、对应建议金额、免费模式及媒体处理状态
-- `GET /api/history`：按匿名 Cookie 返回当前浏览器的生成记录及实时状态
+- `GET /api/history`：按匿名 Cookie 返回当前浏览器的生成记录、实时状态和排队信息
 - `GET /api/works/search?name=`：按完整名字精确查询已完成或等待前端处理的作品，最多返回最近 20 个同名结果；待处理结果附带恢复凭证
 - `POST /api/analytics/events`：批量接收匿名访问、可见停留和交互事件
 - `GET` / `POST` / `DELETE /api/admin/session`：检查、创建和退出后台会话
@@ -92,7 +92,7 @@
 - `GET /api/admin/jobs/:id/sheet`：后台查看任务保留的九宫格母图
 - `POST /api/orders/donation`：提交 `title` 和 `model=lite|pro` 后创建免费生成凭证；不传模型时默认 Pro
 - `POST /api/jobs`：上传照片并创建任务；服务端保存上传原图、文件信息和无需额外权限的请求/设备线索
-- `GET /api/jobs/:id`：读取任务和永久素材
+- `GET /api/jobs/:id`：读取任务、排队信息和永久素材
 - `PATCH /api/jobs/:id/appearance`：作品主人保存背景与装饰显示设置
 - `GET /api/jobs/:id/sheet`：凭作品令牌读取九宫格母图
 - `POST /api/jobs/:id/faces`：上传浏览器本地抠图后的九张 WebP（兼容旧 PNG）
@@ -158,8 +158,8 @@ node scripts/sync-home-examples.mjs
 - 正式入口：Nginx `https://tinymoods.mikeywa.site`
 - 旧入口：`https://9face.mikeywa.site` 保留为带路径和参数的 `301` 跳转
 - HTTPS：Let's Encrypt 自动续期，当前证书有效至 `2026-11-17`
-- 当前发布：`/opt/9face/releases/20260820103300`
-- 直接回滚点：`/opt/9face/releases/20260820095900`
+- 当前发布：`/opt/9face/releases/20260820104500`
+- 直接回滚点：`/opt/9face/releases/20260820103300`
 - 运营后台与埋点已发布；模型 API Key、管理密码、会话密钥和埋点盐值只保存在服务器环境文件，不进入仓库
 - 后续每个完成任务默认执行本地提交、推送和正式部署
 
