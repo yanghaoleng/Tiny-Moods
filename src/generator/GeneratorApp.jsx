@@ -1791,7 +1791,7 @@ function Landing({resumeOrderId, onRenderExample, onJobCreated, onOpenWork}) {
           <span>作者主页</span>
           <ArrowSquareOut weight="bold" aria-hidden="true" />
         </a>
-        <button type="button" className="landing-privacy-trigger" onClick={() => setPrivacyInfoOpen(true)} data-uisfx="open" data-analytics-action="privacy_info_open">
+        <button type="button" className="landing-author-link landing-privacy-trigger" onClick={() => setPrivacyInfoOpen(true)} data-uisfx="open" data-analytics-action="privacy_info_open">
           <span>用户隐私说明与功能说明</span>
           <ArrowSquareOut weight="bold" aria-hidden="true" />
         </button>
