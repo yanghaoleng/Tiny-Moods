@@ -1483,6 +1483,36 @@ function WorkHistoryDialog({onClose, onOpenWork}) {
   );
 }
 
+function PrivacyInfoDialog({onClose}) {
+  const reduceMotion = useReducedMotion();
+
+  useEffect(() => {
+    const onKeyDown = (event) => { if (event.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  return (
+    <motion.div className="privacy-info-backdrop" initial={{opacity: 0}} animate={{opacity: 1}} exit={{opacity: 0}} onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      <motion.section className="privacy-info-dialog" initial={reduceMotion ? false : {opacity: 0, y: 24, scale: 0.98}} animate={{opacity: 1, y: 0, scale: 1}} exit={reduceMotion ? {opacity: 0} : {opacity: 0, y: 12}} role="dialog" aria-modal="true" aria-labelledby="privacy-info-title">
+        <div className="privacy-info-header">
+          <div>
+            <span className="privacy-info-kicker">使用前请了解</span>
+            <h2 id="privacy-info-title">用户隐私说明与功能说明</h2>
+          </div>
+          <button type="button" className="privacy-info-close" onClick={onClose} aria-label="关闭说明" data-uisfx="close"><X weight="bold" /></button>
+        </div>
+        <div className="privacy-info-sections">
+          <section><h3>用户隐私</h3><p>用户照片会临时保存，用于 Bug 调试和风控审核，并将在上传之日起一个月内自动删除；另会收集不敏感的基础使用信息，用于数据分析与体验改进。</p></section>
+          <section><h3>版权说明</h3><p>部分音乐素材录制自抖音其他用户创作的内容，版权归原作者所有，仅供个人学习与技术研究使用。如权利人认为存在侵权，请联系我们及时处理。</p></section>
+          <section><h3>功能与盈利说明</h3><p>本工具是用于技术测试的 Demo，不以盈利为目的，也不承诺作为正式商业服务持续提供。</p></section>
+        </div>
+        <p className="privacy-info-contact">如有疑问或发现侵权，请联系微信 <strong>yanghaoleng</strong>，或发送邮件至 <a href="mailto:yanghaoleng@icloud.com">yanghaoleng@icloud.com</a>。</p>
+      </motion.section>
+    </motion.div>
+  );
+}
+
 function Landing({resumeOrderId, onRenderExample, onJobCreated, onOpenWork}) {
   const reduceMotion = useReducedMotion();
   const inputRef = useRef(null);
@@ -1496,6 +1526,7 @@ function Landing({resumeOrderId, onRenderExample, onJobCreated, onOpenWork}) {
   const [order, setOrder] = useState(null);
   const [donationOpen, setDonationOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [privacyInfoOpen, setPrivacyInfoOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [health, setHealth] = useState(null);
@@ -1756,15 +1787,20 @@ function Landing({resumeOrderId, onRenderExample, onJobCreated, onOpenWork}) {
       </motion.section>
 
       <footer className="landing-footer">
-        <a href="https://mikeywa.site" target="_blank" rel="noreferrer" aria-label="打开作者主页" data-uisfx="open" data-analytics-action="author_home_open">
+        <a className="landing-author-link" href="https://mikeywa.site" target="_blank" rel="noreferrer" aria-label="打开作者主页" data-uisfx="open" data-analytics-action="author_home_open">
           <span>作者主页</span>
           <ArrowSquareOut weight="bold" aria-hidden="true" />
         </a>
+        <button type="button" className="landing-privacy-trigger" onClick={() => setPrivacyInfoOpen(true)} data-uisfx="open" data-analytics-action="privacy_info_open">
+          <span>用户隐私说明与功能说明</span>
+          <ArrowSquareOut weight="bold" aria-hidden="true" />
+        </button>
       </footer>
 
       <AnimatePresence>{donationOpen ? <DonationDialog busy={submitting} error={error} models={health?.imageModels?.length ? health.imageModels : fallbackDonationModels} onClose={() => { if (!submitting) setDonationOpen(false); }} onContinue={continueAfterDonation} /> : null}</AnimatePresence>
       <AnimatePresence>{previewProfile ? <ExamplePreviewDialog profile={previewProfile} onClose={() => setPreviewProfileId("")} onRender={(appearance) => onRenderExample(previewProfile.id, appearance)} /> : null}</AnimatePresence>
       <AnimatePresence>{historyOpen ? <WorkHistoryDialog onClose={() => setHistoryOpen(false)} onOpenWork={(work) => { setHistoryOpen(false); onOpenWork(work); }} /> : null}</AnimatePresence>
+      <AnimatePresence>{privacyInfoOpen ? <PrivacyInfoDialog onClose={() => setPrivacyInfoOpen(false)} /> : null}</AnimatePresence>
     </main>
   );
 }
