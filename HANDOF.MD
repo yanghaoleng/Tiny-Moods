@@ -199,7 +199,8 @@
 - 已移除首页与服务端示例注册、九张公开 WebP 和同步配置；桌面三列，手机横滑。
 - 旧 `?demo=jennie` 回到首页；示例 API、生成图片和公开示例素材地址返回 410。历史用户作品与服务器记录保留。
 - 发布前核对线上源码与 Git 基线一致；在独立工作区构建，保留主工作区未提交改动。
-- 构建与语法检查通过，1280px/375px 首页和三个案例预览通过。待完成正式切换与公网复核。
+- 构建与语法检查通过；公网 1280px/375px 首页、三个案例预览、旧示例 410、后台登录页通过，首页与 JS/CSS 哈希一致。
+- 功能提交 `81e4018` 已推送 `main`，正式发布 `/opt/9face/releases/20260911163244`；回滚点 `/opt/9face/releases/20260824160822`。主机 `115.159.25.169`，当前 SSH 别名 `mikeywa-rive-old`。
 
 - 互动页：`src/JennieExperience.jsx`、`src/styles.css`
 - 分享与保存：`src/generator/GeneratorApp.jsx`、`src/generator/generator.css`
