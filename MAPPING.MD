@@ -63,7 +63,7 @@
 | 永久链接 | 作品或 DEMO 地址 | `?view=:id` / `?demo=:id` |
 | 分享二维码 / 表情二维码 | 小圆点、少量深彩点、圆形定位点与圆角方形头像底板的 1080×1080 永久链接码 | `QrShareBubble` / `buildQrCodeDataUrl` / `drawFinder` / `.qr-share-bubble` / `.qr-bubble-image` |
 | 团子示例 | 团子九表情互动页 | `?demo=tuanzi` / `tuanziAvatars` |
-| Jennie 示例 | 由永久作品 `cec29c58067e4bdc9b6c197b540e7b74` 同步的互动页 | `?demo=jennie` / `featuredJennieAvatars` |
+| Jennie 示例（已下架） | 首页入口、公开示例素材与同步配置已移除；旧示例接口返回 410，历史作品记录保留 | `?demo=jennie` 返回首页 / `/api/jobs/demo-jennie` / `/generated/demo-jennie/*` |
 | 耙耙柑 / 小太阳 | 鹦鹉互动页 | `?demo=sun-conure` / `sunConureAvatars` |
 | 羊石坨坨示例 | 由永久作品 `0794c461bc974ab395b539f70e52b2bf` 同步的互动页 | `?demo=yangshi-tuotuo` / `yangshiTuotuoAvatars` |
 | 同步首页案例 | 永久作品转 720px 透明 WebP | `scripts/sync-home-examples.mjs` |

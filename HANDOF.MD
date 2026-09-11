@@ -194,6 +194,13 @@
 
 ## 关键文件
 
+### 2026-09-11 Jennie 示例下架
+
+- 已移除首页与服务端示例注册、九张公开 WebP 和同步配置；桌面三列，手机横滑。
+- 旧 `?demo=jennie` 回到首页；示例 API、生成图片和公开示例素材地址返回 410。历史用户作品与服务器记录保留。
+- 发布前核对线上源码与 Git 基线一致；在独立工作区构建，保留主工作区未提交改动。
+- 构建与语法检查通过，1280px/375px 首页和三个案例预览通过。待完成正式切换与公网复核。
+
 - 互动页：`src/JennieExperience.jsx`、`src/styles.css`
 - 分享与保存：`src/generator/GeneratorApp.jsx`、`src/generator/generator.css`
 - 图片预览与接口：`server/index.mjs`、`server/pipeline.mjs`

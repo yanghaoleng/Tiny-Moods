@@ -150,12 +150,6 @@ const sunConureAvatars = Array.from({length: 9}, (_, index) => ({
   label: `耙耙柑 可爱瞬间 ${index + 1}`,
 }));
 
-const featuredJennieAvatars = Array.from({length: 9}, (_, index) => ({
-  ...clayTheme,
-  src: exampleFaceUrl("jennie", index),
-  label: `Jennie 可爱瞬间 ${index + 1}`,
-}));
-
 const yangshiTuotuoAvatars = Array.from({length: 9}, (_, index) => ({
   ...clayTheme,
   src: exampleFaceUrl("yangshi-tuotuo", index),
@@ -163,7 +157,6 @@ const yangshiTuotuoAvatars = Array.from({length: 9}, (_, index) => ({
 }));
 
 const exampleProfiles = [
-  {id: "jennie", name: "Jennie", avatars: featuredJennieAvatars, brand: "JENNIE 9", lookCount: 9},
   {id: "tuanzi", name: "团子", avatars: tuanziAvatars, brand: "团子 9", lookCount: 9},
   {id: "sun-conure", name: "耙耙柑", avatars: sunConureAvatars, brand: "耙耙柑 9", lookCount: 9},
   {id: "yangshi-tuotuo", name: "羊石坨坨", avatars: yangshiTuotuoAvatars, brand: "羊石坨坨 9", lookCount: 9},

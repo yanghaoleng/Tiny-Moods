@@ -126,11 +126,6 @@ const findOriginalSheetFilename = async (job, directory) => {
 };
 const demoProfiles = [
   {
-    id: "jennie",
-    title: "Jennie",
-    sources: Array.from({length: 9}, (_, index) => path.join(projectRoot, "public", "examples", "jennie", `face-${String(index + 1).padStart(2, "0")}.webp`)),
-  },
-  {
     id: "tuanzi",
     title: "团子",
     sources: Array.from({length: 9}, (_, index) => path.join(projectRoot, "public", "examples", "tuanzi", `face-${String(index + 1).padStart(2, "0")}.webp`)),
@@ -1009,6 +1004,12 @@ app.post("/api/jobs", photoUpload.single("photo"), async (request, response) => 
       });
     }
   });
+});
+
+// Retired public example: keep historical stored data, but stop serving demo routes.
+app.use(["/api/jobs/demo-jennie", "/generated/demo-jennie", "/examples/jennie"], (_request, response) => {
+  response.setHeader("Cache-Control", "no-store");
+  response.status(410).json({error: "这个示例已下架，请返回首页查看其他案例"});
 });
 
 app.get("/api/jobs/:id", (request, response) => {

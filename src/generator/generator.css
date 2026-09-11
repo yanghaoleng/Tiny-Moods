@@ -563,7 +563,6 @@
   width: 36%;
 }
 
-.hero-example-jennie { top: 4%; left: 2%; z-index: 4; width: 34%; }
 .hero-example-tuanzi { top: 0; right: 5%; z-index: 5; width: 38%; }
 .hero-example-sun-conure { bottom: 3%; left: 7%; z-index: 3; width: 33%; }
 .hero-example-yangshi-tuotuo { right: 1%; bottom: 5%; z-index: 4; width: 37%; }
@@ -1909,7 +1908,7 @@
 
 .example-gallery {
   display: grid;
-  grid-template-columns: 0.92fr 1.12fr 0.9fr 1.03fr;
+  grid-template-columns: 1.12fr 0.9fr 1.03fr;
   align-items: end;
   gap: clamp(16px, 2.4vw, 30px);
 }

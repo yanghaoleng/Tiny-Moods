@@ -7,11 +7,6 @@ const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "
 const origin = process.env.PUBLIC_ORIGIN || "https://tinymoods.mikeywa.site";
 const examples = [
   {
-    id: "cec29c58067e4bdc9b6c197b540e7b74",
-    folder: "jennie",
-    name: "Jennie",
-  },
-  {
     id: "0794c461bc974ab395b539f70e52b2bf",
     folder: "yangshi-tuotuo",
     name: "羊石坨坨",
