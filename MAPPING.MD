@@ -89,6 +89,17 @@
 | B 端 / 后台 / 运营后台 | 内部生成与行为数据控制台 | `/admin` / `AdminApp` / `.admin-page` |
 | 后台白屏 / 看板不显示 / 键盘不出来 | 后台动态模块没有渲染，优先检查入口与后台代码块是否属于同一次构建 | `index-DdA7IXE2.js` / `AdminApp-C1qDO1aF.js` / Vite dynamic import |
 | 正式域名 / Tiny Moods 网站 | 对外唯一 HTTPS 入口，旧 `9face` 域名跳转至此 | `https://tinymoods.mikeywa.site` / `PUBLIC_ORIGIN` / `deploy/9face.nginx.conf` |
+| 参赛封面 / 比赛首图 | 3:2、1536×1024 的宣传主视觉，关键内容位于居中 86% 安全区 | `competition-materials/2026-08-26/covers/*.png` |
+| 团子对比封面 / 第一个方案换团子 | 左侧团子代表表情到右侧九种透明表情的参赛封面，按 375px 手机宽度放大 | `covers/01-before-after-tuanzi.png` / `thumbnails/01-before-after-tuanzi-375.png` / `cover-7` |
+| 团子糖果冲击版 | “一张小脸，可爱九次”的大众投票向封面 | `covers/08-tuanzi-candy-impact.png` / `cover-8` |
+| 团子极简产品版 | “上传一次，得到九张”的产品价值向封面 | `covers/09-tuanzi-editorial-product.png` / `cover-9` |
+| 团子夜色情绪版 | “今天，团子什么心情？”的情绪分享向封面 | `covers/10-tuanzi-emotion-night.png` / `cover-10` |
+| 团子丝带 9 封面 | 玫红丝带构成数字 9、九张团子沿丝带展开的情绪价值版 | `covers/11-tuanzi-refined-rose-nine.png` / `cover-11` / `.rose-nine` |
+| 团子金属镜头封面 | 九张团子进入真实金属光圈、突出一次上传与低门槛的产品版 | `covers/12-tuanzi-refined-chrome-lens.png` / `cover-12` / `.chrome-lens` |
+| 团子情绪光带封面 | 九张团子沿珊瑚玫红光带展开的电影感分享版 | `covers/13-tuanzi-refined-cinematic-wave.png` / `cover-13` / `.cinematic-cast` |
+| 大众投票封面 | 突出一次上传得到九种表情的人物版封面 | `covers/02-upload-nine.png` |
+| 详情页封面 | 突出真实互动页与分享操作的界面版封面 | `covers/03-one-page.png` |
+| 专业答辩封面 | 突出 Seedream、服务端密钥和真实作品的技术版封面 | `covers/06-tech-credibility.png` |
 | 后台密码 / 密码键盘 | 无账户名的 6 位管理口令；手机数字键盘、电脑数字键与回车兼容 | `ADMIN_PASSWORD` / `#admin-password` / `inputMode="numeric"` |
 | 后台总览 / 数据大盘 | 生成数量、访问、停留、交互和成本汇总 | `/api/admin/dashboard` / `.admin-overview` |
 | 生成记录 / 作品列表 | 可筛选的九图与永久链接列表 | `JobCard` / `.admin-job-grid` |

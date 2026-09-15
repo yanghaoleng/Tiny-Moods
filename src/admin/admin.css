@@ -269,7 +269,7 @@
 .admin-content {
   width: min(1500px, calc(100% - 48px));
   margin: 0 auto;
-  padding: 28px 0 56px;
+  padding: 18px 0 48px;
 }
 
 .admin-overview {
@@ -279,6 +279,7 @@
   border-radius: var(--admin-radius);
   background: var(--admin-paper);
   overflow: hidden;
+  margin-top: 14px;
 }
 
 .admin-metric {
@@ -472,8 +473,8 @@
 }
 
 .admin-jobs-section {
-  margin-top: 16px;
-  padding: 24px;
+  margin-top: 0;
+  padding: 18px;
 }
 
 .admin-section-heading p {
@@ -486,7 +487,7 @@
   display: grid;
   grid-template-columns: minmax(240px, 1fr) 150px 130px auto;
   gap: 9px;
-  margin-top: 20px;
+  margin-top: 14px;
 }
 
 .admin-search {
@@ -541,9 +542,9 @@
 
 .admin-job-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 18px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+  margin-top: 14px;
   transition: opacity 0.15s ease;
 }
 
@@ -562,9 +563,9 @@
 .admin-job-open {
   width: 100%;
   display: grid;
-  grid-template-columns: 168px minmax(0, 1fr);
-  gap: 16px;
-  padding: 14px;
+  grid-template-columns: 118px minmax(0, 1fr);
+  gap: 12px;
+  padding: 10px;
   border: 0;
   color: inherit;
   background: transparent;
@@ -648,7 +649,7 @@
 .admin-job-title-line h3 {
   margin: 0;
   overflow: hidden;
-  font-size: 18px;
+  font-size: 16px;
   letter-spacing: -0.02em;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -686,7 +687,7 @@
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  margin: 10px 0 0;
+  margin: 7px 0 0;
   color: var(--admin-muted);
   font-size: 11px;
 }
@@ -700,8 +701,8 @@
 .admin-job-data {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 11px 14px;
-  margin-top: 22px;
+  gap: 7px 10px;
+  margin-top: 13px;
 }
 
 .admin-job-data span {
@@ -718,12 +719,12 @@
 }
 
 .admin-job-footer {
-  min-height: 40px;
+  min-height: 34px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 8px 14px;
+  padding: 6px 10px;
   border-top: 1px solid var(--admin-line);
   color: var(--admin-muted);
   font-size: 10px;
@@ -828,13 +829,13 @@
 
 .admin-job-skeletons {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 18px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+  margin-top: 14px;
 }
 
 .admin-job-skeletons span {
-  height: 250px;
+  height: 190px;
   border-radius: 12px;
   background: linear-gradient(90deg, #eee9eb 25%, #f8f5f6 50%, #eee9eb 75%);
   background-size: 200% 100%;
@@ -847,6 +848,101 @@
 
 .admin-recent-panel {
   margin-top: 16px;
+}
+
+.admin-traffic-section {
+  margin-top: 16px;
+  padding: 18px;
+  border: 1px solid var(--admin-line);
+  border-radius: var(--admin-radius);
+  background: var(--admin-paper);
+}
+
+.admin-traffic-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.admin-traffic-grid > .admin-panel {
+  min-width: 0;
+  padding: 16px;
+  background: #fff;
+}
+
+.admin-breakdown-list {
+  display: grid;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-breakdown-list li {
+  min-width: 0;
+  min-height: 32px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  border-bottom: 1px solid #eee9eb;
+  font-size: 11px;
+}
+
+.admin-breakdown-list li:last-child {
+  border-bottom: 0;
+}
+
+.admin-breakdown-list li > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-breakdown-list strong {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 7px;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-breakdown-list small {
+  min-width: 31px;
+  color: var(--admin-muted);
+  font-size: 9px;
+  font-weight: 750;
+  text-align: right;
+}
+
+.admin-breakdown-empty {
+  min-height: 86px;
+  display: grid;
+  place-items: center;
+  color: var(--admin-muted);
+  font-size: 11px;
+  text-align: center;
+}
+
+.admin-device-groups {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 14px;
+}
+
+.admin-breakdown-group {
+  min-width: 0;
+}
+
+.admin-breakdown-group h3 {
+  margin: 0;
+  color: var(--admin-muted);
+  font-size: 10px;
+}
+
+.admin-breakdown-group .admin-breakdown-list {
+  margin-top: 6px;
 }
 
 .admin-event-list {
@@ -1119,7 +1215,7 @@
 
   .admin-job-grid,
   .admin-job-skeletons {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -1174,8 +1270,15 @@
   }
 
   .admin-panel,
-  .admin-jobs-section {
+  .admin-jobs-section,
+  .admin-traffic-section {
     padding: 16px;
+  }
+
+  .admin-traffic-grid,
+  .admin-job-grid,
+  .admin-job-skeletons {
+    grid-template-columns: 1fr;
   }
 
   .admin-toolbar {
@@ -1283,6 +1386,11 @@
 
   .admin-chart {
     gap: 3px;
+  }
+
+  .admin-device-groups {
+    grid-template-columns: 1fr;
+    gap: 12px;
   }
 }
 

@@ -111,6 +111,36 @@ const actionText = {
 };
 
 const readableAction = (value) => actionText[value] || value || "未命名交互";
+const deviceText = {desktop: "桌面端", mobile: "手机", tablet: "平板", unknown: "未知设备"};
+const readableDevice = (value) => deviceText[value] || value || "未知设备";
+const readableLocation = (location) => [location?.country, location?.region, location?.city]
+  .filter((value, index, items) => value && items.indexOf(value) === index)
+  .join(" / ");
+
+function RankedList({items, empty, formatLabel = (value) => value, limit = 8}) {
+  const shown = (items || []).slice(0, limit);
+  const total = (items || []).reduce((sum, item) => sum + Number(item.count || 0), 0);
+  if (!shown.length) return <div className="admin-breakdown-empty">{empty}</div>;
+  return (
+    <ol className="admin-breakdown-list">
+      {shown.map((item) => (
+        <li key={item.label}>
+          <span title={formatLabel(item.label)}>{formatLabel(item.label)}</span>
+          <strong>{item.count}<small>{Number.isFinite(item.percentage) ? `${item.percentage}%` : total ? `${Math.round(item.count / total * 100)}%` : "0%"}</small></strong>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function BreakdownGroup({title, items, empty, formatLabel}) {
+  return (
+    <div className="admin-breakdown-group">
+      <h3>{title}</h3>
+      <RankedList items={items} empty={empty} formatLabel={formatLabel} />
+    </div>
+  );
+}
 
 function Login({configured, onLogin}) {
   const [password, setPassword] = useState("");
@@ -252,7 +282,7 @@ function EventList({events, compact = false}) {
           <div>
             <strong>{event.name === "interaction" ? readableAction(event.properties?.action) : eventText[event.name] || event.name}</strong>
             <span>
-              {[event.page, event.device, event.properties?.target || event.properties?.method, event.sessionId ? `会话 ${event.sessionId.slice(0, 8)}` : ""].filter(Boolean).join(" / ")}
+              {[event.page, readableDevice(event.device), event.browser, event.os, event.trafficSource, readableLocation(event.location), event.properties?.target || event.properties?.method, event.sessionId ? `会话 ${event.sessionId.slice(0, 8)}` : ""].filter(Boolean).join(" / ")}
             </span>
           </div>
           <div>
@@ -448,6 +478,7 @@ export default function AdminApp() {
   if (!session.authenticated) return <Login configured={session.configured} onLogin={() => setSession({configured: true, authenticated: true})} />;
 
   const overview = data?.overview || {};
+  const acquisition = data?.acquisition || {};
   return (
     <main className="admin-page">
       <header className="admin-header">
@@ -463,6 +494,41 @@ export default function AdminApp() {
       </header>
 
       <div className="admin-content">
+        <section className="admin-jobs-section">
+          <div className="admin-section-heading">
+            <div><h2>最新生成作品</h2><p>最新作品优先，点击即可查看九图、固定链接、生成参数和关联埋点。</p></div>
+            <span>{data?.pagination?.total || 0} 条</span>
+          </div>
+          <div className="admin-toolbar">
+            <label className="admin-search"><MagnifyingGlass weight="bold" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索名字、任务 ID 或订单 ID" /></label>
+            <select value={status} onChange={(event) => setStatus(event.target.value)} aria-label="筛选生成状态">
+              <option value="all">全部状态</option>
+              <option value="ready">已完成</option>
+              <option value="failed">失败</option>
+              <option value="awaiting_client_processing">等待本地处理</option>
+              <option value="generating">生成中</option>
+              <option value="queued">排队中</option>
+            </select>
+            <select value={days} onChange={(event) => setDays(event.target.value)} aria-label="选择埋点时间范围">
+              <option value="1">今天</option>
+              <option value="7">近 7 天</option>
+              <option value="30">近 30 天</option>
+              <option value="90">近 90 天</option>
+              <option value="0">全部时间</option>
+            </select>
+            <label className="admin-checkbox"><input type="checkbox" checked={includeDemos} onChange={(event) => setIncludeDemos(event.target.checked)} /><span>包含案例</span></label>
+          </div>
+          {error ? <div className="admin-error">{error}<button type="button" onClick={() => setRefreshKey((value) => value + 1)}>重试</button></div> : null}
+          {loading && !data ? <div className="admin-job-skeletons">{Array.from({length: 9}, (_, index) => <span key={index} />)}</div> : null}
+          {!loading && data && !data.jobs.length ? <div className="admin-empty"><ImageSquare weight="bold" /><h3>没有匹配的生成记录</h3><p>调整搜索词或筛选条件后再试。</p></div> : null}
+          {data?.jobs?.length ? <div className={`admin-job-grid ${loading ? "is-refreshing" : ""}`}>{data.jobs.map((job) => <JobCard key={job.id} job={job} onOpen={openJob} />)}</div> : null}
+          {data?.pagination?.pages > 1 ? <div className="admin-pagination">
+            <button type="button" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>上一页</button>
+            <span>第 {data.pagination.page} / {data.pagination.pages} 页</span>
+            <button type="button" disabled={page >= data.pagination.pages} onClick={() => setPage((value) => value + 1)}>下一页</button>
+          </div> : null}
+        </section>
+
         <section className="admin-overview" aria-label="核心数据">
           <Metric label="正式生成" value={overview.totalJobs ?? "-"} note={`今天 ${overview.todayJobs || 0} 次，完成 ${overview.readyJobs || 0} 次`} />
           <Metric label="生成图片" value={overview.totalImages ?? "-"} note={`${overview.permanentJobs || 0} 个永久作品`} />
@@ -491,39 +557,33 @@ export default function AdminApp() {
           </div>
         </section>
 
-        <section className="admin-jobs-section">
+        <section className="admin-traffic-section">
           <div className="admin-section-heading">
-            <div><h2>生成记录</h2><p>查看九张成图、永久链接、生成参数和关联埋点。</p></div>
-            <span>{data?.pagination?.total || 0} 条</span>
+            <div><h2>访问来源与访客环境</h2><p>按会话首次进入统计。IP 位置为城市级近似结果，不保存原始 IP。</p></div>
+            <span>{acquisition.totalEntrances || 0} 次进入</span>
           </div>
-          <div className="admin-toolbar">
-            <label className="admin-search"><MagnifyingGlass weight="bold" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索名字、任务 ID 或订单 ID" /></label>
-            <select value={status} onChange={(event) => setStatus(event.target.value)} aria-label="筛选生成状态">
-              <option value="all">全部状态</option>
-              <option value="ready">已完成</option>
-              <option value="failed">失败</option>
-              <option value="awaiting_client_processing">等待本地处理</option>
-              <option value="generating">生成中</option>
-              <option value="queued">排队中</option>
-            </select>
-            <select value={days} onChange={(event) => setDays(event.target.value)} aria-label="选择埋点时间范围">
-              <option value="1">今天</option>
-              <option value="7">近 7 天</option>
-              <option value="30">近 30 天</option>
-              <option value="90">近 90 天</option>
-              <option value="0">全部时间</option>
-            </select>
-            <label className="admin-checkbox"><input type="checkbox" checked={includeDemos} onChange={(event) => setIncludeDemos(event.target.checked)} /><span>包含案例</span></label>
+          <div className="admin-traffic-grid">
+            <div className="admin-panel">
+              <div className="admin-panel-heading"><h2>访问来源</h2><span>{periodLabel}</span></div>
+              <RankedList items={acquisition.sources} empty="新访问上线后开始记录来源" />
+            </div>
+            <div className="admin-panel">
+              <div className="admin-panel-heading"><h2>跳转前域名</h2><span>Referrer</span></div>
+              <RankedList items={acquisition.referrers} empty="当前没有可识别的跳转域名" />
+            </div>
+            <div className="admin-panel admin-device-panel">
+              <div className="admin-panel-heading"><h2>设备</h2><span>类型、浏览器与系统</span></div>
+              <div className="admin-device-groups">
+                <BreakdownGroup title="设备类型" items={acquisition.devices} empty="暂无设备数据" formatLabel={readableDevice} />
+                <BreakdownGroup title="浏览器" items={acquisition.browsers} empty="暂无浏览器数据" />
+                <BreakdownGroup title="操作系统" items={acquisition.systems} empty="暂无系统数据" />
+              </div>
+            </div>
+            <div className="admin-panel">
+              <div className="admin-panel-heading"><h2>IP 粗略位置</h2><span>已识别 {acquisition.locatedSessions || 0} 个会话</span></div>
+              <RankedList items={acquisition.locations} empty="新访问上线后开始记录城市级位置" />
+            </div>
           </div>
-          {error ? <div className="admin-error">{error}<button type="button" onClick={() => setRefreshKey((value) => value + 1)}>重试</button></div> : null}
-          {loading && !data ? <div className="admin-job-skeletons">{Array.from({length: 6}, (_, index) => <span key={index} />)}</div> : null}
-          {!loading && data && !data.jobs.length ? <div className="admin-empty"><ImageSquare weight="bold" /><h3>没有匹配的生成记录</h3><p>调整搜索词或筛选条件后再试。</p></div> : null}
-          {data?.jobs?.length ? <div className={`admin-job-grid ${loading ? "is-refreshing" : ""}`}>{data.jobs.map((job) => <JobCard key={job.id} job={job} onOpen={openJob} />)}</div> : null}
-          {data?.pagination?.pages > 1 ? <div className="admin-pagination">
-            <button type="button" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>上一页</button>
-            <span>第 {data.pagination.page} / {data.pagination.pages} 页</span>
-            <button type="button" disabled={page >= data.pagination.pages} onClick={() => setPage((value) => value + 1)}>下一页</button>
-          </div> : null}
         </section>
 
         <section className="admin-panel admin-recent-panel">

@@ -613,8 +613,9 @@ button {
   }
 
   .stage.is-embedded .experience-display-controls {
-    right: 12px;
-    left: auto;
+    right: auto;
+    left: max(92px, calc(env(safe-area-inset-left) + 92px));
+    max-width: calc(100% - 158px);
     translate: 0;
   }
 

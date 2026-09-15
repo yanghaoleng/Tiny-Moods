@@ -97,9 +97,13 @@ export function usePageAnalytics(context) {
       language: navigator.language,
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       viewport: `${window.innerWidth}x${window.innerHeight}`,
+      siteHost: window.location.host,
       referrerHost: (() => {
         try { return document.referrer ? new URL(document.referrer).host : ""; } catch { return ""; }
       })(),
+      utmSource: new URLSearchParams(window.location.search).get("utm_source") || "",
+      utmMedium: new URLSearchParams(window.location.search).get("utm_medium") || "",
+      utmCampaign: new URLSearchParams(window.location.search).get("utm_campaign") || "",
     }, context);
 
     const heartbeat = window.setInterval(() => reportStay("heartbeat"), HEARTBEAT_MS);

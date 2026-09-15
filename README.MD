@@ -4,6 +4,8 @@
 
 公开仓库：<https://github.com/yanghaoleng/Tiny-Moods>
 
+参赛包装物料：`competition-materials/2026-08-26/`，包含产品介绍、6 张 `1536×1024` 封面、`390×260` 缩略图和核验记录；本轮未修改产品功能、未提交、未部署。
+
 ## 产品目标
 
 用户上传一张有权使用的人物或宠物正脸照，生成九张透明纯头部表情、永久互动页和 9:16 短视频。生成前可选择 Seedream 5.0 Lite 或 Pro，默认 Pro；微信/支付宝打赏为自愿支持，不核验金额。
@@ -169,3 +171,10 @@ node scripts/sync-home-examples.mjs
 
 - Seedream Lite 每次生成一张 `2K` 九宫格，当前项目估算 `0.22 元`；Pro 每次生成一张 `2144×2144` 九宫格，当前项目估算 `0.60 元`
 - 本地拆图、抠图和反复渲染视频不产生模型费用，也不消耗服务器渲染资源
+
+## 参赛包装
+
+- 第 1 版对比结构新增团子案例封面：`competition-materials/2026-08-26/covers/01-before-after-tuanzi.png`
+- 同步提供 `390×260` 与 `375×250` 缩略图和居中 `86%` 安全区复核图；本次只更新参赛物料，不改产品功能。
+- 团子案例另有 3 个发散方向：糖果冲击版、极简产品版、夜色情绪版，均使用真实九表情并完成 375px 缩略验收。
+- 团子封面精修版新增丝带“9”、金属镜头、电影感情绪光带 3 个广告级方向：`11-tuanzi-refined-rose-nine.png`、`12-tuanzi-refined-chrome-lens.png`、`13-tuanzi-refined-cinematic-wave.png`；均使用 Image 2 底图、真实团子九表情与确定性中文排版。

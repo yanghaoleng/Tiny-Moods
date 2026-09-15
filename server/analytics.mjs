@@ -1,6 +1,8 @@
 import crypto from "node:crypto";
 import {appendFile, mkdir, readdir, readFile} from "node:fs/promises";
+import {isIP} from "node:net";
 import path from "node:path";
+import {GeoLite2} from "@maxminddatabase/geolite2";
 
 const allowedEventNames = new Set([
   "page_view",
@@ -39,6 +41,83 @@ const coarseDevice = (userAgent = "") => {
   if (/ipad|tablet/.test(value)) return "tablet";
   if (/mobile|iphone|android/.test(value)) return "mobile";
   return "desktop";
+};
+
+const browserName = (userAgent = "") => {
+  const value = String(userAgent);
+  if (/MicroMessenger/i.test(value)) return "微信浏览器";
+  if (/Edg\//i.test(value)) return "Edge";
+  if (/OPR\//i.test(value)) return "Opera";
+  if (/CriOS|Chrome\//i.test(value)) return "Chrome";
+  if (/FxiOS|Firefox\//i.test(value)) return "Firefox";
+  if (/Safari\//i.test(value)) return "Safari";
+  return "其他浏览器";
+};
+
+const operatingSystem = (userAgent = "") => {
+  const value = String(userAgent);
+  if (/iPhone|iPad|iPod/i.test(value)) return "iOS / iPadOS";
+  if (/Android/i.test(value)) return "Android";
+  if (/Windows/i.test(value)) return "Windows";
+  if (/Macintosh|Mac OS X/i.test(value)) return "macOS";
+  if (/Linux/i.test(value)) return "Linux";
+  return "其他系统";
+};
+
+const normalizeIp = (value) => String(value || "").trim().replace(/^::ffff:/, "").replace(/^\[|\]$/g, "");
+const privateIp = (value) => (
+  value === "::1"
+  || value === "127.0.0.1"
+  || /^10\./.test(value)
+  || /^192\.168\./.test(value)
+  || /^172\.(1[6-9]|2\d|3[01])\./.test(value)
+  || /^fc|^fd|^fe80:/i.test(value)
+);
+const localizedName = (record) => text(record?.names?.["zh-CN"] || record?.names?.en, 80);
+
+let cityReader = null;
+let cityReaderUnavailable = false;
+const coarseLocation = (request) => {
+  const ip = normalizeIp(request.ip);
+  if (!isIP(ip)) return null;
+  if (privateIp(ip)) return {countryCode: "LOCAL", country: "本地网络", region: "", city: "", timezone: ""};
+  if (!cityReader && !cityReaderUnavailable) {
+    try {
+      cityReader = new GeoLite2("City").reader;
+    } catch {
+      cityReaderUnavailable = true;
+    }
+  }
+  if (!cityReader) return null;
+  try {
+    const match = cityReader?.city(ip);
+    if (!match) return null;
+    const subdivision = match.subdivisions?.[0];
+    const country = match.country || match.registeredCountry;
+    return {
+      countryCode: text(country?.isoCode, 8),
+      country: localizedName(country),
+      region: localizedName(subdivision),
+      city: localizedName(match.city),
+      timezone: text(match.location?.timeZone, 64),
+    };
+  } catch {
+    return null;
+  }
+};
+
+const normalizedHost = (value) => text(value, 160).toLowerCase().replace(/^www\./, "");
+const hostMatches = (host, domains) => domains.some((domain) => host === domain || host.endsWith(`.${domain}`));
+const trafficSource = (properties = {}) => {
+  const utmSource = text(properties.utmSource, 80);
+  const referrerHost = normalizedHost(properties.referrerHost);
+  const siteHost = normalizedHost(properties.siteHost);
+  if (utmSource) return `UTM: ${utmSource}`;
+  if (!referrerHost) return "直接访问";
+  if (siteHost && (referrerHost === siteHost || referrerHost.endsWith(`.${siteHost}`))) return "站内跳转";
+  if (hostMatches(referrerHost, ["baidu.com", "bing.com", "google.com", "google.com.hk", "so.com", "sogou.com", "sm.cn"])) return "搜索引擎";
+  if (hostMatches(referrerHost, ["weixin.qq.com", "wechat.com", "weibo.com", "xiaohongshu.com", "douyin.com", "tiktok.com", "zhihu.com", "qq.com"])) return "社交平台";
+  return "外部网站";
 };
 
 const validOccurredAt = (value, fallback) => {
@@ -81,6 +160,10 @@ export function createAnalyticsStore({dataRoot, salt = crypto.randomBytes(32).to
       durationMs: name === "page_stay" ? number(input.durationMs, 0, 10 * 60 * 1000) || 0 : null,
       properties: cleanProperties(input.properties),
       device: coarseDevice(request.get("user-agent")),
+      browser: browserName(request.get("user-agent")),
+      os: operatingSystem(request.get("user-agent")),
+      trafficSource: name === "page_view" ? trafficSource(input.properties) : null,
+      location: name === "page_view" ? coarseLocation(request) : null,
       occurredAt: validOccurredAt(input.occurredAt, receivedAt),
       receivedAt,
     };
@@ -159,6 +242,26 @@ export function summarizeEvents(events) {
   let visits = 0;
   let interactions = 0;
 
+  const entranceViews = new Map();
+  const entrancePriority = (event) => {
+    if (text(event.properties?.utmSource, 80)) return 0;
+    const referrerHost = normalizedHost(event.properties?.referrerHost);
+    const siteHost = normalizedHost(event.properties?.siteHost);
+    if (referrerHost && (!siteHost || (referrerHost !== siteHost && !referrerHost.endsWith(`.${siteHost}`)))) return 1;
+    if (!referrerHost) return 2;
+    return 3;
+  };
+  events
+    .filter((event) => event.name === "page_view")
+    .sort((left, right) => Date.parse(left.occurredAt) - Date.parse(right.occurredAt))
+    .forEach((event) => {
+      const existing = entranceViews.get(event.sessionId);
+      if (!existing || (
+        Date.parse(event.occurredAt) === Date.parse(existing.occurredAt)
+        && entrancePriority(event) < entrancePriority(existing)
+      )) entranceViews.set(event.sessionId, event);
+    });
+
   events.forEach((event) => {
     sessions.add(event.sessionId);
     eventCounts.set(event.name, (eventCounts.get(event.name) || 0) + 1);
@@ -207,6 +310,39 @@ export function summarizeEvents(events) {
     lastEventAt: value.lastEventAt,
   }]));
 
+  const ranked = (values, total, limit = 12) => [...values.entries()]
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0], "zh-CN"))
+    .slice(0, limit)
+    .map(([label, count]) => ({
+      label,
+      count,
+      percentage: total ? Math.round(count / total * 100) : 0,
+    }));
+  const sourceCounts = new Map();
+  const referrerCounts = new Map();
+  const deviceCounts = new Map();
+  const browserCounts = new Map();
+  const osCounts = new Map();
+  const locationCounts = new Map();
+  let locatedSessions = 0;
+
+  entranceViews.forEach((event) => {
+    const source = event.trafficSource || trafficSource(event.properties);
+    const referrer = normalizedHost(event.properties?.referrerHost) || "直接访问";
+    const device = text(event.device, 40) || "unknown";
+    const browser = text(event.browser, 40) || "未知浏览器";
+    const os = text(event.os, 40) || "未知系统";
+    const locationParts = [event.location?.country, event.location?.region, event.location?.city].filter((value, index, items) => value && items.indexOf(value) === index);
+    const location = locationParts.join(" / ") || "未知位置";
+    sourceCounts.set(source, (sourceCounts.get(source) || 0) + 1);
+    referrerCounts.set(referrer, (referrerCounts.get(referrer) || 0) + 1);
+    deviceCounts.set(device, (deviceCounts.get(device) || 0) + 1);
+    browserCounts.set(browser, (browserCounts.get(browser) || 0) + 1);
+    osCounts.set(os, (osCounts.get(os) || 0) + 1);
+    locationCounts.set(location, (locationCounts.get(location) || 0) + 1);
+    if (location !== "未知位置") locatedSessions += 1;
+  });
+
   return {
     totalEvents: events.length,
     visits,
@@ -219,6 +355,16 @@ export function summarizeEvents(events) {
       .sort((left, right) => right[1] - left[1])
       .slice(0, 12)
       .map(([action, count]) => ({action, count})),
+    acquisition: {
+      totalEntrances: entranceViews.size,
+      locatedSessions,
+      sources: ranked(sourceCounts, entranceViews.size),
+      referrers: ranked(referrerCounts, entranceViews.size),
+      devices: ranked(deviceCounts, entranceViews.size),
+      browsers: ranked(browserCounts, entranceViews.size),
+      systems: ranked(osCounts, entranceViews.size),
+      locations: ranked(locationCounts, entranceViews.size),
+    },
     perJob: normalizedPerJob,
     daily: [...daily.values()]
       .sort((left, right) => left.date.localeCompare(right.date))
